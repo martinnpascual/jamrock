@@ -1,7 +1,15 @@
-export default function Page() {
+import { DispensasHistorial } from '@/components/tables/DispensasHistorial'
+
+export default function DispensasPage() {
   return (
-    <div className="flex items-center justify-center h-48 text-slate-400">
-      <p className="text-sm">Próximamente — en construcción</p>
+    <div className="space-y-6 max-w-6xl">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-800">Dispensas</h2>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Historial inmutable — los registros no pueden modificarse ni eliminarse
+        </p>
+      </div>
+      <DispensasHistorial />
     </div>
   )
 }
