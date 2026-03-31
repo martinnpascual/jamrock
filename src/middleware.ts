@@ -47,8 +47,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Obtener rol del usuario
-  const { data: profile } = await supabase
+  // Obtener rol del usuario — usamos service_role para evitar problemas de RLS en edge
+  const { createClient: createAdminSupabase } = await import('@supabase/supabase-js')
+  const adminClient = createAdminSupabase(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('role, is_active')
     .eq('id', user.id)
