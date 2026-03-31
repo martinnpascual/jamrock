@@ -1,131 +1,293 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Syringe, Package, ClipboardList } from 'lucide-react'
+import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock } from 'lucide-react'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 export default async function DashboardPage() {
   const supabase = createClient()
 
-  // KPIs básicos
-  const [membersRes, dispensasHoyRes, solicitudesRes] = await Promise.all([
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('is_deleted', false),
-    supabase.from('dispensations').select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date().toISOString().split('T')[0]),
-    supabase.from('enrollment_requests').select('id', { count: 'exact', head: true }).eq('status', 'pendiente'),
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', user!.id)
+    .single()
+
+  const today = new Date().toISOString().split('T')[0]
+
+  const [
+    sociosActivosRes,
+    dispensasHoyRes,
+    sociosVencidosRes,
+    stockBajoRes,
+    solicitudesRes,
+    dispensasRecentesRes,
+  ] = await Promise.all([
+    supabase
+      .from('members')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_deleted', false)
+      .eq('reprocann_status', 'activo'),
+    supabase
+      .from('dispensations')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', `${today}T00:00:00`)
+      .eq('type', 'normal'),
+    supabase
+      .from('members')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_deleted', false)
+      .eq('reprocann_status', 'vencido'),
+    supabase
+      .from('medical_stock_lots')
+      .select('id, genetics, current_grams')
+      .eq('is_deleted', false)
+      .lt('current_grams', 50)
+      .gt('current_grams', 0),
+    supabase
+      .from('enrollment_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pendiente'),
+    supabase
+      .from('dispensations')
+      .select(`
+        dispensation_number, quantity_grams, genetics, created_at,
+        members!dispensations_member_id_fkey(first_name, last_name)
+      `)
+      .eq('type', 'normal')
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
-  const totalSocios = membersRes.count ?? 0
-  const dispensasHoy = dispensasHoyRes.count ?? 0
-  const solicitudesPendientes = solicitudesRes.count ?? 0
+  const isGerente = profile?.role === 'gerente'
+  const firstName = profile?.full_name?.split(' ')[0] ?? null
 
-  const kpis = [
-    {
-      title: 'Socios activos',
-      value: totalSocios,
-      icon: Users,
-      color: 'text-green-600',
-      bg: 'bg-green-50',
-    },
-    {
-      title: 'Dispensas hoy',
-      value: dispensasHoy,
-      icon: Syringe,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
-    },
-    {
-      title: 'Solicitudes pendientes',
-      value: solicitudesPendientes,
-      icon: ClipboardList,
-      color: 'text-yellow-600',
-      bg: 'bg-yellow-50',
-    },
-    {
-      title: 'Stock medicinal',
-      value: '—',
-      icon: Package,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
-    },
-  ]
+  type Alert = { msg: string; href: string; color: string }
+  const alerts: Alert[] = []
+  if ((sociosVencidosRes.count ?? 0) > 0) {
+    alerts.push({
+      msg: `${sociosVencidosRes.count} socio(s) con REPROCANN vencido`,
+      href: '/socios?status=vencido',
+      color: 'text-red-700 bg-red-50 border-red-200',
+    })
+  }
+  if ((solicitudesRes.count ?? 0) > 0) {
+    alerts.push({
+      msg: `${solicitudesRes.count} solicitud(es) pendiente(s) de revisión`,
+      href: '/solicitudes',
+      color: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+    })
+  }
+  if ((stockBajoRes.data?.length ?? 0) > 0) {
+    alerts.push({
+      msg: `${stockBajoRes.data?.length} lote(s) de stock medicinal bajo (< 50g)`,
+      href: '/stock',
+      color: 'text-orange-700 bg-orange-50 border-orange-200',
+    })
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">Resumen del día</h2>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Buen día{firstName ? `, ${firstName}` : ''}
+        </h2>
         <p className="text-sm text-slate-500 mt-0.5">
-          {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleDateString('es-AR', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
         </p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon
-          return (
-            <Card key={kpi.title} className="shadow-sm border-slate-200">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{kpi.title}</p>
-                    <p className="text-3xl font-bold text-slate-800 mt-1">{kpi.value}</p>
-                  </div>
-                  <div className={`w-10 h-10 ${kpi.bg} rounded-lg flex items-center justify-center`}>
-                    <Icon className={`w-5 h-5 ${kpi.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+        <KPICard
+          title="Socios activos"
+          value={sociosActivosRes.count ?? 0}
+          icon={Users}
+          color="text-green-600"
+          bg="bg-green-50"
+          href="/socios"
+        />
+        <KPICard
+          title="Dispensas hoy"
+          value={dispensasHoyRes.count ?? 0}
+          icon={Syringe}
+          color="text-blue-600"
+          bg="bg-blue-50"
+          href="/dispensas"
+        />
+        <KPICard
+          title="Solicitudes"
+          value={solicitudesRes.count ?? 0}
+          icon={ClipboardList}
+          color="text-yellow-600"
+          bg="bg-yellow-50"
+          href="/solicitudes"
+          badge={(solicitudesRes.count ?? 0) > 0}
+        />
+        <KPICard
+          title="REPROCANN vencidos"
+          value={sociosVencidosRes.count ?? 0}
+          icon={AlertTriangle}
+          color="text-red-600"
+          bg="bg-red-50"
+          href="/socios?status=vencido"
+          badge={(sociosVencidosRes.count ?? 0) > 0}
+        />
       </div>
 
-      {/* Accesos rápidos */}
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-slate-700">Accesos rápidos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            <a
-              href="/socios/nuevo"
-              className="flex items-center gap-3 p-4 border border-slate-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors group"
+      {/* Alertas — solo gerente */}
+      {isGerente && alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((a, i) => (
+            <Link
+              key={i}
+              href={a.href}
+              className={cn(
+                'flex items-center justify-between px-4 py-3 rounded-lg border text-sm font-medium hover:opacity-80 transition-opacity',
+                a.color
+              )}
             >
-              <div className="w-9 h-9 bg-green-100 group-hover:bg-green-200 rounded-lg flex items-center justify-center transition-colors">
-                <Users className="w-4.5 h-4.5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Nuevo socio</p>
-                <p className="text-xs text-slate-400">Dar de alta</p>
-              </div>
-            </a>
-            <a
-              href="/dispensas/nueva"
-              className="flex items-center gap-3 p-4 border border-slate-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group"
-            >
-              <div className="w-9 h-9 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors">
-                <Syringe className="w-4.5 h-4.5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Nueva dispensa</p>
-                <p className="text-xs text-slate-400">Registrar entrega</p>
-              </div>
-            </a>
-          </div>
-        </CardContent>
-      </Card>
+              <span>{a.msg}</span>
+              <ArrowRight className="w-4 h-4 flex-shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
 
-      {/* Sistema listo */}
-      <Card className="shadow-sm border-green-200 bg-green-50">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Acciones rápidas */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-slate-700">Acciones rápidas</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3">
+            <QuickAction href="/socios/nuevo" label="Nuevo socio" sub="Dar de alta" colorClass="hover:border-green-300 hover:bg-green-50" emoji="👤" />
+            <QuickAction href="/dispensas/nueva" label="Nueva dispensa" sub="Registrar entrega" colorClass="hover:border-blue-300 hover:bg-blue-50" emoji="💊" />
+            <QuickAction href="/solicitudes" label="Solicitudes" sub={`${solicitudesRes.count ?? 0} pendientes`} colorClass="hover:border-yellow-300 hover:bg-yellow-50" emoji="📋" />
+            <QuickAction href="/socios" label="Ver socios" sub="Lista completa" colorClass="hover:border-slate-300 hover:bg-slate-50" emoji="👥" />
+          </CardContent>
+        </Card>
+
+        {/* Últimas dispensas */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-semibold text-slate-700">Últimas dispensas</CardTitle>
+            <Link href="/dispensas" className="text-xs text-green-600 hover:underline">
+              Ver todas
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {(dispensasRecentesRes.data ?? []).length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-xs text-slate-400">Sin dispensas registradas hoy</p>
+                <Link href="/dispensas/nueva" className="text-xs text-green-600 hover:underline mt-1 inline-block">
+                  Registrar primera dispensa
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {(dispensasRecentesRes.data ?? []).map((d: any) => (
+                  <div key={d.dispensation_number} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-slate-700">
+                        {d.members
+                          ? Array.isArray(d.members)
+                            ? `${d.members[0]?.first_name} ${d.members[0]?.last_name}`
+                            : `${d.members.first_name} ${d.members.last_name}`
+                          : '—'}
+                      </p>
+                      <p className="text-xs text-slate-400 font-mono">{d.genetics} · {d.dispensation_number}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-4">
+                      <p className="text-sm font-semibold text-slate-700">{d.quantity_grams}g</p>
+                      <p className="text-xs text-slate-400 flex items-center justify-end gap-0.5">
+                        <Clock className="w-2.5 h-2.5" />
+                        {new Date(d.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function KPICard({
+  title,
+  value,
+  icon: Icon,
+  color,
+  bg,
+  href,
+  badge,
+}: {
+  title: string
+  value: number
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+  bg: string
+  href: string
+  badge?: boolean
+}) {
+  return (
+    <Link href={href}>
+      <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardContent className="p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <p className="text-sm text-green-800 font-medium">Sistema operativo — Wave 1.1 completada</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide leading-tight">{title}</p>
+              <p className="text-3xl font-bold text-slate-800 mt-1">{value}</p>
+            </div>
+            <div className={cn('relative w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', bg)}>
+              <Icon className={cn('w-5 h-5', color)} />
+              {badge && value > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </div>
           </div>
-          <p className="text-xs text-green-700 mt-1 ml-5">
-            Base de datos, autenticación y roles configurados. Continuando con Wave 1.2 (Gestión de socios).
-          </p>
         </CardContent>
       </Card>
-    </div>
+    </Link>
+  )
+}
+
+function QuickAction({
+  href,
+  label,
+  sub,
+  colorClass,
+  emoji,
+}: {
+  href: string
+  label: string
+  sub: string
+  colorClass: string
+  emoji: string
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'flex items-center gap-3 p-3 border border-slate-200 rounded-lg transition-colors',
+        colorClass
+      )}
+    >
+      <span className="text-xl leading-none">{emoji}</span>
+      <div>
+        <p className="text-sm font-medium text-slate-700">{label}</p>
+        <p className="text-xs text-slate-400">{sub}</p>
+      </div>
+    </Link>
   )
 }
