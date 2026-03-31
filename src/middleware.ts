@@ -47,26 +47,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Obtener rol del usuario — fetch directo a REST API con service_role (bypass RLS en edge)
-  const profileRes = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role,is_active&limit=1`,
-    {
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-      },
-    }
-  )
-  const profileArr = profileRes.ok ? await profileRes.json() : []
-  const profile = profileArr?.[0] ?? null
+  // Leer el rol del app_metadata (está en el JWT — no requiere query a DB)
+  const role = (user.app_metadata?.role ?? '') as keyof typeof ROLE_ROUTES
 
-  // Usuario sin perfil o inactivo → logout
-  if (!profile || !profile.is_active) {
+  // Usuario sin rol válido → logout
+  if (!role || !ROLE_ROUTES[role]) {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
   }
-
-  const role = profile.role as keyof typeof ROLE_ROUTES
   const allowedRoutes = ROLE_ROUTES[role] || []
 
   // Verificar que el rol tiene acceso a la ruta solicitada
