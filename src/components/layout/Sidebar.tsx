@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { role, profile, loading } = useRole()
+  const { role, displayName, loading } = useRole()
 
   const visibleItems = NAV_ITEMS.filter(item =>
     role ? item.roles.includes(role) : false
@@ -101,11 +101,11 @@ export function Sidebar() {
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
           <div className="w-8 h-8 bg-green-700 rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">
-              {profile?.full_name?.charAt(0).toUpperCase() || '?'}
+              {displayName !== '...' ? displayName.charAt(0).toUpperCase() : '?'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-slate-200 text-xs font-medium truncate">{profile?.full_name || '...'}</p>
+            <p className="text-slate-200 text-xs font-medium truncate">{displayName}</p>
             <p className="text-slate-500 text-xs capitalize">{role || '...'}</p>
           </div>
           <form action="/api/auth/signout" method="POST">
