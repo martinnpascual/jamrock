@@ -47,17 +47,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Obtener rol del usuario — usamos service_role para evitar problemas de RLS en edge
-  const { createClient: createAdminSupabase } = await import('@supabase/supabase-js')
-  const adminClient = createAdminSupabase(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  // Obtener rol del usuario — fetch directo a REST API con service_role (bypass RLS en edge)
+  const profileRes = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role,is_active&limit=1`,
+    {
+      headers: {
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+      },
+    }
   )
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single()
+  const profileArr = profileRes.ok ? await profileRes.json() : []
+  const profile = profileArr?.[0] ?? null
 
   // Usuario sin perfil o inactivo → logout
   if (!profile || !profile.is_active) {
