@@ -33,8 +33,8 @@ function LoginForm() {
       return
     }
 
-    router.push('/dashboard')
-    router.refresh()
+    // Full page reload para que el middleware lea los cookies de sesión correctamente
+    window.location.href = '/dashboard'
   }
 
   return (
