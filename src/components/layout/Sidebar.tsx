@@ -18,6 +18,7 @@ import {
   Settings,
   Leaf,
   LogOut,
+  X,
 } from 'lucide-react'
 
 interface NavItem {
@@ -28,20 +29,20 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['gerente', 'secretaria', 'cultivador'] },
-  { label: 'Socios', href: '/socios', icon: Users, roles: ['gerente', 'secretaria', 'cultivador'] },
-  { label: 'Dispensas', href: '/dispensas', icon: Syringe, roles: ['gerente', 'secretaria'] },
-  { label: 'Stock', href: '/stock', icon: Package, roles: ['gerente', 'secretaria', 'cultivador'] },
-  { label: 'Ventas / Caja', href: '/ventas', icon: ShoppingCart, roles: ['gerente', 'secretaria'] },
-  { label: 'Pagos', href: '/pagos', icon: CreditCard, roles: ['gerente', 'secretaria'] },
-  { label: 'Proveedores', href: '/proveedores', icon: Truck, roles: ['gerente', 'secretaria', 'cultivador'] },
-  { label: 'Eventos', href: '/eventos', icon: CalendarDays, roles: ['gerente', 'secretaria', 'cultivador'] },
-  { label: 'Solicitudes', href: '/solicitudes', icon: ClipboardList, roles: ['gerente', 'secretaria'] },
-  { label: 'Reportes', href: '/reportes', icon: BarChart3, roles: ['gerente'] },
-  { label: 'Configuración', href: '/configuracion', icon: Settings, roles: ['gerente'] },
+  { label: 'Dashboard',    href: '/dashboard',    icon: LayoutDashboard, roles: ['gerente', 'secretaria', 'cultivador'] },
+  { label: 'Socios',       href: '/socios',       icon: Users,           roles: ['gerente', 'secretaria', 'cultivador'] },
+  { label: 'Dispensas',    href: '/dispensas',    icon: Syringe,         roles: ['gerente', 'secretaria'] },
+  { label: 'Stock',        href: '/stock',        icon: Package,         roles: ['gerente', 'secretaria', 'cultivador'] },
+  { label: 'Ventas / Caja',href: '/ventas',       icon: ShoppingCart,    roles: ['gerente', 'secretaria'] },
+  { label: 'Pagos',        href: '/pagos',        icon: CreditCard,      roles: ['gerente', 'secretaria'] },
+  { label: 'Proveedores',  href: '/proveedores',  icon: Truck,           roles: ['gerente', 'secretaria', 'cultivador'] },
+  { label: 'Eventos',      href: '/eventos',      icon: CalendarDays,    roles: ['gerente', 'secretaria', 'cultivador'] },
+  { label: 'Solicitudes',  href: '/solicitudes',  icon: ClipboardList,   roles: ['gerente', 'secretaria'] },
+  { label: 'Reportes',     href: '/reportes',     icon: BarChart3,       roles: ['gerente'] },
+  { label: 'Configuración',href: '/configuracion',icon: Settings,        roles: ['gerente'] },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { role, displayName, loading } = useRole()
 
@@ -56,10 +57,20 @@ export function Sidebar() {
         <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <Leaf className="w-5 h-5 text-white" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-slate-100 font-semibold text-sm leading-tight">Jamrock Club</p>
           <p className="text-slate-400 text-xs leading-tight">Gestión interna</p>
         </div>
+        {/* Close button — mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden text-slate-400 hover:text-slate-200 p-1 transition-colors flex-shrink-0"
+            aria-label="Cerrar menú"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -85,7 +96,7 @@ export function Sidebar() {
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 )}
               >
-                <Icon className={cn('w-4.5 h-4.5 flex-shrink-0', isActive ? 'text-green-400' : '')} />
+                <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-green-400' : '')} />
                 {item.label}
                 {isActive && (
                   <span className="ml-auto w-1.5 h-1.5 bg-green-400 rounded-full" />
