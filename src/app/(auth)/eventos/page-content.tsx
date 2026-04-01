@@ -117,7 +117,7 @@ export default function EventosPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Estado</Label>
-                <Select defaultValue="planificado" onValueChange={v => setValue('status', v as EventFormData['status'])}>
+                <Select defaultValue="planificado" onValueChange={v => v !== null && setValue('status', v as EventFormData['status'])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{EVENT_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                 </Select>
@@ -198,7 +198,7 @@ function EventCard({ event: ev, isExpanded, onToggle, isGerente }: { event: Even
             <div className="flex items-center justify-between pt-2 border-t border-slate-200">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">Estado:</span>
-                <Select value={ev.status} onValueChange={v => updateStatus.mutate({ id: ev.id, status: v })}>
+                <Select value={ev.status} onValueChange={v => v !== null && updateStatus.mutate({ id: ev.id, status: v })}>
                   <SelectTrigger className="h-7 text-xs w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>{EVENT_STATUSES.map(s => <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>)}</SelectContent>
                 </Select>
@@ -239,7 +239,7 @@ function AttendeesPanel({ eventId, isGerente, eventStatus }: { eventId: string; 
       <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Asistentes ({attendees.length})</p>
       {canEdit && (
         <div className="flex gap-2">
-          <Select value={selectedMember} onValueChange={setSelectedMember}>
+          <Select value={selectedMember} onValueChange={v => v !== null && setSelectedMember(v)}>
             <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Agregar socio..." /></SelectTrigger>
             <SelectContent>
               {availableMembers.map(m => <SelectItem key={m.id} value={m.id} className="text-xs">{m.first_name} {m.last_name} · {m.member_number}</SelectItem>)}
