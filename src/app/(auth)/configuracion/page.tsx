@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRole } from '@/hooks/useRole'
 import { useAppConfig, useSaveAppConfig } from '@/hooks/useAppConfig'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,189 +9,276 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Settings, Lock } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { UserRole } from '@/types/database'
 
-type FormState = {
+// ─── Types ───────────────────────────────────────────────────────────────────
+type ClubForm = {
   club_name: string
   club_address: string
   default_membership_fee: string
   max_grams_per_dispensa: string
   club_phone: string
 }
-
-const DEFAULTS: FormState = {
-  club_name: '',
-  club_address: '',
-  default_membership_fee: '',
-  max_grams_per_dispensa: '',
-  club_phone: '',
+type AlertForm = {
+  alert_stock_medicinal_g: string
+  alert_reprocann_days: string
+  alert_cuota_days: string
+}
+type Operator = {
+  id: string
+  full_name: string
+  role: UserRole
+  is_active: boolean
+  created_at: string
 }
 
+const CLUB_DEFAULTS: ClubForm = { club_name: '', club_address: '', default_membership_fee: '', max_grams_per_dispensa: '', club_phone: '' }
+const ALERT_DEFAULTS: AlertForm = { alert_stock_medicinal_g: '100', alert_reprocann_days: '30', alert_cuota_days: '35' }
+
+const ROLE_LABEL: Record<UserRole, string> = { gerente: 'Gerente', secretaria: 'Secretaria', cultivador: 'Cultivador' }
+const ROLE_COLOR: Record<UserRole, string> = {
+  gerente: 'bg-purple-50 text-purple-700 border-purple-200',
+  secretaria: 'bg-blue-50 text-blue-700 border-blue-200',
+  cultivador: 'bg-green-50 text-green-700 border-green-200',
+}
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+function useOperators() {
+  return useQuery<Operator[]>({
+    queryKey: ['operators'],
+    queryFn: async () => {
+      const res = await fetch('/api/operators')
+      if (!res.ok) throw new Error('Error cargando operadores')
+      const body = await res.json()
+      return body.operators
+    },
+  })
+}
+function useToggleOperator() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const res = await fetch('/api/operators', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error) }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operators'] }),
+  })
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracionPage() {
-  const { isGerente } = useRole()
-  const { data: config, isLoading } = useAppConfig()
+  const { role } = useRole()
+  const isGerente = role === 'gerente'
+  const readOnly = !isGerente
+
+  const { data: config, isLoading: configLoading } = useAppConfig()
   const saveConfig = useSaveAppConfig()
 
-  const [form, setForm] = useState<FormState>(DEFAULTS)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [clubForm, setClubForm] = useState<ClubForm>(CLUB_DEFAULTS)
+  const [alertForm, setAlertForm] = useState<AlertForm>(ALERT_DEFAULTS)
+  const [clubSaved, setClubSaved] = useState(false)
+  const [alertSaved, setAlertSaved] = useState(false)
+  const [clubError, setClubError] = useState('')
+  const [alertError, setAlertError] = useState('')
 
-  // Sync form cuando lleguen los datos
   useEffect(() => {
     if (config) {
-      setForm({
+      setClubForm({
         club_name: config.club_name ?? '',
         club_address: config.club_address ?? '',
         default_membership_fee: config.default_membership_fee ?? '',
         max_grams_per_dispensa: config.max_grams_per_dispensa ?? '',
         club_phone: config.club_phone ?? '',
       })
+      setAlertForm({
+        alert_stock_medicinal_g: config.alert_stock_medicinal_g ?? '100',
+        alert_reprocann_days: config.alert_reprocann_days ?? '30',
+        alert_cuota_days: config.alert_cuota_days ?? '35',
+      })
     }
   }, [config])
 
-  function handleChange(key: keyof FormState, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    if (saveError) setSaveError(null)
-    if (saveSuccess) setSaveSuccess(false)
+  async function saveClub(e: React.FormEvent) {
+    e.preventDefault(); setClubError(''); setClubSaved(false)
+    try { await saveConfig.mutateAsync(clubForm); setClubSaved(true) }
+    catch (err) { setClubError(err instanceof Error ? err.message : 'Error') }
   }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaveError(null)
-    setSaveSuccess(false)
-    try {
-      await saveConfig.mutateAsync(form)
-      setSaveSuccess(true)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Error al guardar')
-    }
+  async function saveAlerts(e: React.FormEvent) {
+    e.preventDefault(); setAlertError(''); setAlertSaved(false)
+    try { await saveConfig.mutateAsync(alertForm); setAlertSaved(true) }
+    catch (err) { setAlertError(err instanceof Error ? err.message : 'Error') }
   }
-
-  if (isLoading) {
-    return (
-      <div className="max-w-2xl space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  const readOnly = !isGerente
 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-          <Settings className="w-5 h-5 text-slate-500" />
-          Configuración
+          <Settings className="w-5 h-5 text-slate-500" />Configuración
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">
-          Parámetros generales del club. {readOnly && 'Solo el gerente puede editar estos valores.'}
+          Parámetros generales del club.{readOnly && ' Solo el gerente puede editar estos valores.'}
         </p>
       </div>
 
+      {/* ── Sección 1: Club ── */}
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-base flex items-center gap-2">
-            Configuración del club
+            Datos del club{readOnly && <Lock className="w-4 h-4 text-slate-400" />}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {configLoading ? (
+            <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : (
+            <form onSubmit={saveClub} className="space-y-4">
+              <Field label="Nombre del club" value={clubForm.club_name} onChange={v => setClubForm(p => ({ ...p, club_name: v }))} placeholder="Ej: Jamrock Cannabis Club" disabled={readOnly} />
+              <Field label="Dirección" value={clubForm.club_address} onChange={v => setClubForm(p => ({ ...p, club_address: v }))} placeholder="Ej: Av. Corrientes 1234, CABA" disabled={readOnly} />
+              <Field label="Teléfono de contacto" value={clubForm.club_phone} onChange={v => setClubForm(p => ({ ...p, club_phone: v }))} placeholder="+54 11 4567-8901" disabled={readOnly} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Cuota mensual ($)" type="number" value={clubForm.default_membership_fee} onChange={v => setClubForm(p => ({ ...p, default_membership_fee: v }))} placeholder="5000" disabled={readOnly} />
+                <Field label="Máx. gramos por dispensa" type="number" value={clubForm.max_grams_per_dispensa} onChange={v => setClubForm(p => ({ ...p, max_grams_per_dispensa: v }))} placeholder="30" disabled={readOnly} />
+              </div>
+              <SaveRow error={clubError} saved={clubSaved} pending={saveConfig.isPending} readOnly={readOnly} />
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Sección 2: Umbrales de alertas ── */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="w-4 h-4 text-slate-500" />Umbrales de alertas
             {readOnly && <Lock className="w-4 h-4 text-slate-400" />}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Nombre del club */}
-            <div className="space-y-1.5">
-              <Label htmlFor="club_name">Nombre del club</Label>
-              <Input
-                id="club_name"
-                value={form.club_name}
-                onChange={(e) => handleChange('club_name', e.target.value)}
-                placeholder="Ej: Jamrock Cannabis Club"
-                disabled={readOnly}
-              />
-            </div>
-
-            {/* Dirección */}
-            <div className="space-y-1.5">
-              <Label htmlFor="club_address">Dirección</Label>
-              <Input
-                id="club_address"
-                value={form.club_address}
-                onChange={(e) => handleChange('club_address', e.target.value)}
-                placeholder="Ej: Av. Corrientes 1234, CABA"
-                disabled={readOnly}
-              />
-            </div>
-
-            {/* Teléfono */}
-            <div className="space-y-1.5">
-              <Label htmlFor="club_phone">Teléfono de contacto</Label>
-              <Input
-                id="club_phone"
-                value={form.club_phone}
-                onChange={(e) => handleChange('club_phone', e.target.value)}
-                placeholder="Ej: +54 11 4567-8901"
-                disabled={readOnly}
-              />
-            </div>
-
-            {/* Cuota mensual */}
-            <div className="space-y-1.5">
-              <Label htmlFor="default_membership_fee">Cuota mensual default ($)</Label>
-              <Input
-                id="default_membership_fee"
+          {configLoading ? (
+            <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : (
+            <form onSubmit={saveAlerts} className="space-y-4">
+              <Field
+                label="Stock medicinal bajo (gramos)"
                 type="number"
-                min="0"
-                step="any"
-                value={form.default_membership_fee}
-                onChange={(e) => handleChange('default_membership_fee', e.target.value)}
-                placeholder="Ej: 5000"
+                value={alertForm.alert_stock_medicinal_g}
+                onChange={v => setAlertForm(p => ({ ...p, alert_stock_medicinal_g: v }))}
+                placeholder="100"
+                helper="Alertar cuando un lote tiene menos de X gramos"
                 disabled={readOnly}
               />
-            </div>
-
-            {/* Máximo gramos por dispensa */}
-            <div className="space-y-1.5">
-              <Label htmlFor="max_grams_per_dispensa">Máximo gramos por dispensa</Label>
-              <Input
-                id="max_grams_per_dispensa"
+              <Field
+                label="REPROCANN — días de aviso previo"
                 type="number"
-                min="0"
-                step="any"
-                value={form.max_grams_per_dispensa}
-                onChange={(e) => handleChange('max_grams_per_dispensa', e.target.value)}
-                placeholder="Ej: 30"
+                value={alertForm.alert_reprocann_days}
+                onChange={v => setAlertForm(p => ({ ...p, alert_reprocann_days: v }))}
+                placeholder="30"
+                helper="Alertar X días antes del vencimiento"
                 disabled={readOnly}
               />
-            </div>
-
-            {/* Feedback */}
-            {saveError && (
-              <p className="text-sm text-red-500">{saveError}</p>
-            )}
-            {saveSuccess && (
-              <p className="text-sm text-green-600 font-medium">Configuración guardada correctamente.</p>
-            )}
-
-            {/* Botón — solo para gerente */}
-            {!readOnly && (
-              <div className="pt-1">
-                <Button
-                  type="submit"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={saveConfig.isPending}
-                >
-                  {saveConfig.isPending ? 'Guardando...' : 'Guardar cambios'}
-                </Button>
-              </div>
-            )}
-          </form>
+              <Field
+                label="Cuota — días sin pago para alertar"
+                type="number"
+                value={alertForm.alert_cuota_days}
+                onChange={v => setAlertForm(p => ({ ...p, alert_cuota_days: v }))}
+                placeholder="35"
+                helper="Alertar si un socio no pagó en X días"
+                disabled={readOnly}
+              />
+              <SaveRow error={alertError} saved={alertSaved} pending={saveConfig.isPending} readOnly={readOnly} />
+            </form>
+          )}
         </CardContent>
       </Card>
+
+      {/* ── Sección 3: Operadores (solo gerente) ── */}
+      {isGerente && <OperatorsSection />}
+    </div>
+  )
+}
+
+// ─── Operadores ───────────────────────────────────────────────────────────────
+function OperatorsSection() {
+  const { data: operators = [], isLoading } = useOperators()
+  const toggle = useToggleOperator()
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="w-4 h-4 text-slate-500" />Operadores del sistema
+        </CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">Usuarios con acceso al sistema. Para crear nuevos usuarios usá Supabase Authentication.</p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : operators.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-4">Sin operadores registrados</p>
+        ) : (
+          <div className="space-y-2">
+            {operators.map(op => (
+              <div key={op.id} className={cn('flex items-center justify-between px-4 py-3 rounded-xl border', op.is_active ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-200 opacity-60')}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold', op.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500')}>
+                    {op.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{op.full_name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <Badge variant="outline" className={cn('text-xs', ROLE_COLOR[op.role])}>{ROLE_LABEL[op.role]}</Badge>
+                      {!op.is_active && <span className="text-xs text-slate-400">Inactivo</span>}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggle.mutate({ id: op.id, is_active: !op.is_active })}
+                  disabled={toggle.isPending}
+                  title={op.is_active ? 'Desactivar' : 'Activar'}
+                  className={cn('flex-shrink-0 p-1 rounded-lg transition-colors', op.is_active ? 'text-green-500 hover:bg-red-50 hover:text-red-500' : 'text-slate-400 hover:bg-green-50 hover:text-green-500')}
+                >
+                  {toggle.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : op.is_active ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function Field({ label, value, onChange, placeholder, type = 'text', helper, disabled }: {
+  label: string; value: string; onChange: (v: string) => void
+  placeholder?: string; type?: string; helper?: string; disabled?: boolean
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 'any' : undefined} />
+      {helper && <p className="text-xs text-slate-400">{helper}</p>}
+    </div>
+  )
+}
+
+function SaveRow({ error, saved, pending, readOnly }: { error: string; saved: boolean; pending: boolean; readOnly: boolean }) {
+  return (
+    <div className="flex items-center gap-3 pt-1">
+      {!readOnly && (
+        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={pending}>
+          {pending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : 'Guardar'}
+        </Button>
+      )}
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {saved && <p className="text-sm text-green-600 font-medium">Guardado ✓</p>}
     </div>
   )
 }

@@ -11,16 +11,24 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // --- Leer umbrales configurables ---
+  const { data: configRows } = await admin.from('app_config').select('key, value')
+  const cfg = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value as string]))
+  const stockThreshold = Number(cfg.alert_stock_medicinal_g ?? 100)
+  const reprocannDays = Number(cfg.alert_reprocann_days ?? 30)
+  const cuotaDays = Number(cfg.alert_cuota_days ?? 35)
+
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
-  const in30days = new Date(today)
-  in30days.setDate(in30days.getDate() + 30)
-  const in30daysStr = in30days.toISOString().split('T')[0]
+  const inReprocannDays = new Date(today)
+  inReprocannDays.setDate(inReprocannDays.getDate() + reprocannDays)
+  const inReprocannDaysStr = inReprocannDays.toISOString().split('T')[0]
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = yesterday.toISOString().split('T')[0]
-  const ago35days = new Date(today)
-  ago35days.setDate(ago35days.getDate() - 35)
+  const agoCuotaDays = new Date(today)
+  agoCuotaDays.setDate(agoCuotaDays.getDate() - cuotaDays)
 
   // --- Auto-expire REPROCANN vencidos (side effect) ---
   await admin
@@ -37,7 +45,7 @@ export async function GET(request: NextRequest) {
     .eq('reprocann_status', 'activo')
     .eq('is_deleted', false)
     .gte('reprocann_expiry', todayStr)
-    .lte('reprocann_expiry', in30daysStr)
+    .lte('reprocann_expiry', inReprocannDaysStr)
     .order('reprocann_expiry', { ascending: true })
 
   // --- 2. Stock medicinal bajo (< 100g por lote) ---
@@ -45,7 +53,7 @@ export async function GET(request: NextRequest) {
     .from('medical_stock_lots')
     .select('id, genetics, current_grams, lot_date')
     .eq('is_deleted', false)
-    .lt('current_grams', 100)
+    .lt('current_grams', stockThreshold)
     .gt('current_grams', 0)
     .order('current_grams', { ascending: true })
 
@@ -94,7 +102,7 @@ export async function GET(request: NextRequest) {
       .select('member_id')
       .in('member_id', memberIds)
       .eq('is_deleted', false)
-      .gte('created_at', ago35days.toISOString())
+      .gte('created_at', agoCuotaDays.toISOString())
 
     const paidMemberIds = new Set((recentPayments ?? []).map(p => p.member_id))
     cuotasPendientes = membersConCuota.filter(m => !paidMemberIds.has(m.id))
