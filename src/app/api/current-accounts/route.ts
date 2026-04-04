@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error('current-accounts GET error:', error.message, error.code, error.details)
-    return NextResponse.json({ error: 'Error al obtener cuentas' }, { status: 500 })
+    return NextResponse.json({ error: error.message, code: error.code, details: error.details, hint: error.hint }, { status: 500 })
   }
 
   const search = (filters.success && filters.data.search?.toLowerCase()) || ''
