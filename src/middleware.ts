@@ -57,6 +57,11 @@ export async function middleware(request: NextRequest) {
   }
   const allowedRoutes = ROLE_ROUTES[role] || []
 
+  // Las rutas /api/ tienen su propio control de acceso — no aplicar whitelist de roles
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
+
   // Verificar que el rol tiene acceso a la ruta solicitada
   const hasAccess = allowedRoutes.some(route => pathname.startsWith(route))
   if (!hasAccess && pathname !== '/') {
