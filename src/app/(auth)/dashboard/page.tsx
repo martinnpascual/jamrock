@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock } from 'lucide-react'
+import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock, ArrowDownUp } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +25,7 @@ export default async function DashboardPage() {
     stockBajoRes,
     solicitudesRes,
     dispensasRecentesRes,
+    cuentasEnDeudaRes,
   ] = await Promise.all([
     supabase
       .from('members')
@@ -60,6 +61,11 @@ export default async function DashboardPage() {
       .eq('type', 'normal')
       .order('created_at', { ascending: false })
       .limit(5),
+    supabase
+      .from('current_accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_deleted', false)
+      .lt('balance', 0),
   ])
 
   const isGerente = profile?.role === 'gerente'
@@ -141,6 +147,17 @@ export default async function DashboardPage() {
           href="/socios?status=vencido"
           badge={(sociosVencidosRes.count ?? 0) > 0}
         />
+        {isGerente && (
+          <KPICard
+            title="Cuentas en deuda"
+            value={cuentasEnDeudaRes.count ?? 0}
+            icon={ArrowDownUp}
+            color="text-indigo-600"
+            bg="bg-indigo-50"
+            href="/cuentas-corrientes?balance_status=negative"
+            badge={(cuentasEnDeudaRes.count ?? 0) > 0}
+          />
+        )}
       </div>
 
       {/* Alertas — solo gerente */}

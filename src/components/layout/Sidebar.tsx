@@ -19,6 +19,7 @@ import {
   Leaf,
   LogOut,
   X,
+  ArrowDownUp,
 } from 'lucide-react'
 
 interface NavItem {
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Stock',        href: '/stock',        icon: Package,         roles: ['gerente', 'secretaria', 'cultivador'] },
   { label: 'Ventas / Caja',href: '/ventas',       icon: ShoppingCart,    roles: ['gerente', 'secretaria'] },
   { label: 'Pagos',        href: '/pagos',        icon: CreditCard,      roles: ['gerente', 'secretaria'] },
+  { label: 'Cuentas Ctes.',href: '/cuentas-corrientes', icon: ArrowDownUp, roles: ['gerente', 'secretaria'] },
   { label: 'Proveedores',  href: '/proveedores',  icon: Truck,           roles: ['gerente', 'secretaria', 'cultivador'] },
   { label: 'Eventos',      href: '/eventos',      icon: CalendarDays,    roles: ['gerente', 'secretaria', 'cultivador'] },
   { label: 'Solicitudes',  href: '/solicitudes',  icon: ClipboardList,   roles: ['gerente', 'secretaria'] },
