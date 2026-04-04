@@ -33,7 +33,7 @@ export async function GET(
 
   let movQuery = supabase
     .from('current_account_movements')
-    .select(`*, profiles!current_account_movements_created_by_fkey(full_name)`)
+    .select(`*`)
     .eq('account_id', params.id)
     .order('created_at', { ascending: true })
 
@@ -58,7 +58,6 @@ export async function GET(
   const header = ['Fecha', 'Nro Movimiento', 'Concepto', 'Descripción', 'Debe', 'Haber', 'Saldo', 'Operador']
 
   const rows = (movements ?? []).map((m: Record<string, unknown>) => {
-    const profile = m.profiles as { full_name: string } | null
     const debe  = m.movement_type === 'debito'  ? formatAmount(Number(m.amount)) : ''
     const haber = m.movement_type === 'credito' ? formatAmount(Number(m.amount)) : ''
     return [
@@ -69,7 +68,7 @@ export async function GET(
       debe,
       haber,
       formatAmount(Number(m.balance_after)),
-      profile?.full_name ?? '',
+      '',
     ]
   })
 

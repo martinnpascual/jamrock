@@ -38,7 +38,7 @@ export async function GET(
   // Movimientos con filtros de fecha
   let movQuery = supabase
     .from('current_account_movements')
-    .select(`*, profiles!current_account_movements_created_by_fkey(full_name)`, { count: 'exact' })
+    .select(`*`, { count: 'exact' })
     .eq('account_id', params.id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -90,10 +90,10 @@ export async function GET(
   }
 
   // Mapear movimientos
-  const mappedMovements = (movements ?? []).map((m: Record<string, unknown>) => {
-    const profile = m.profiles as { full_name: string } | null
-    return { ...m, profiles: undefined, created_by_name: profile?.full_name ?? null }
-  })
+  const mappedMovements = (movements ?? []).map((m: Record<string, unknown>) => ({
+    ...m,
+    created_by_name: null,
+  }))
 
   const total = count ?? 0
 
