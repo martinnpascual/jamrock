@@ -25,8 +25,7 @@ export async function GET(request: NextRequest) {
     .select(`
       *,
       members!current_accounts_member_id_fkey(first_name, last_name, member_number),
-      suppliers!current_accounts_supplier_id_fkey(name),
-      current_account_movements(created_at)
+      suppliers!current_accounts_supplier_id_fkey(name)
     `)
     .eq('is_deleted', false)
     .order('balance', { ascending: true })
@@ -42,15 +41,16 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
-    console.error('current-accounts GET error:', error.code)
+    console.error('current-accounts GET error:', error.message, error.code, error.details)
     return NextResponse.json({ error: 'Error al obtener cuentas' }, { status: 500 })
   }
+
+  const search = (filters.success && filters.data.search?.toLowerCase()) || ''
 
   // Mapear a formato limpio con entity_name
   const accounts = (data ?? []).map((row: Record<string, unknown>) => {
     const member = row.members as { first_name: string; last_name: string; member_number: string } | null
     const supplier = row.suppliers as { name: string } | null
-    const movements = (row.current_account_movements as { created_at: string }[]) ?? []
 
     const entity_name =
       row.entity_type === 'socio'
@@ -59,22 +59,15 @@ export async function GET(request: NextRequest) {
 
     const entity_number = row.entity_type === 'socio' ? member?.member_number ?? null : null
 
-    const last_movement_at =
-      movements.length > 0
-        ? movements.sort((a, b) => b.created_at.localeCompare(a.created_at))[0].created_at
-        : null
-
-    const search = (filters.success && filters.data.search?.toLowerCase()) || ''
     if (search && !entity_name.toLowerCase().includes(search)) return null
 
     return {
       ...row,
       members: undefined,
       suppliers: undefined,
-      current_account_movements: undefined,
       entity_name,
       entity_number,
-      last_movement_at,
+      last_movement_at: row.updated_at ?? null,
     }
   }).filter(Boolean)
 
