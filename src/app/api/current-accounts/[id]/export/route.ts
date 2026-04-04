@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 // GET /api/current-accounts/[id]/export — exportar CSV
 export async function GET(
@@ -17,10 +16,7 @@ export async function GET(
   const from = searchParams.get('from') ?? null
   const to = searchParams.get('to') ?? null
 
-  const admin = createAdminClient()
-
-  // Obtener nombre de la cuenta para el nombre del archivo
-  const { data: account } = await admin
+  const { data: account } = await supabase
     .from('current_accounts')
     .select(`
       account_number, entity_type,
@@ -35,7 +31,7 @@ export async function GET(
     return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 })
   }
 
-  let movQuery = admin
+  let movQuery = supabase
     .from('current_account_movements')
     .select(`*, profiles!current_account_movements_created_by_fkey(full_name)`)
     .eq('account_id', params.id)

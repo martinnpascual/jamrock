@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 // GET /api/current-accounts/[id] — detalle + movimientos paginados
 export async function GET(
@@ -20,10 +19,8 @@ export async function GET(
   const to = searchParams.get('to') ?? null
   const offset = (page - 1) * limit
 
-  const admin = createAdminClient()
-
-  // Obtener cuenta con entidad
-  const { data: account, error: accountError } = await admin
+  // Usar supabase (con cookie auth) — RLS cubre lectura para gerente/secretaria
+  const { data: account, error: accountError } = await supabase
     .from('current_accounts')
     .select(`
       *,
@@ -38,8 +35,8 @@ export async function GET(
     return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 })
   }
 
-  // Query de movimientos con filtros de fecha
-  let movQuery = admin
+  // Movimientos con filtros de fecha
+  let movQuery = supabase
     .from('current_account_movements')
     .select(`*, profiles!current_account_movements_created_by_fkey(full_name)`, { count: 'exact' })
     .eq('account_id', params.id)
@@ -52,12 +49,12 @@ export async function GET(
   const { data: movements, count, error: movError } = await movQuery
 
   if (movError) {
-    console.error('movements GET error:', movError.code)
+    console.error('movements GET error:', movError.message, movError.code)
     return NextResponse.json({ error: 'Error al obtener movimientos' }, { status: 500 })
   }
 
   // Summary del período
-  let summaryQuery = admin
+  let summaryQuery = supabase
     .from('current_account_movements')
     .select('movement_type, amount')
     .eq('account_id', params.id)

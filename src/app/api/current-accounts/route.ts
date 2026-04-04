@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAccountSchema, accountFiltersSchema } from '@/lib/validations/current-accounts'
 
 // GET /api/current-accounts — lista cuentas con filtros
+// Usa createClient (con cookies del usuario) — RLS permite acceso a gerente/secretaria
 export async function GET(request: NextRequest) {
   const supabase = createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -18,9 +19,8 @@ export async function GET(request: NextRequest) {
     balance_status: searchParams.get('balance_status') ?? undefined,
   })
 
-  const admin = createAdminClient()
-
-  let query = admin
+  // Usar supabase (con cookie auth) — RLS cubre permisos de lectura
+  let query = supabase
     .from('current_accounts')
     .select(`
       *,
@@ -41,13 +41,12 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
-    console.error('current-accounts GET error:', error.message, error.code, error.details)
-    return NextResponse.json({ error: error.message, code: error.code, details: error.details, hint: error.hint }, { status: 500 })
+    console.error('current-accounts GET error:', error.message, error.code)
+    return NextResponse.json({ error: 'Error al obtener cuentas' }, { status: 500 })
   }
 
   const search = (filters.success && filters.data.search?.toLowerCase()) || ''
 
-  // Mapear a formato limpio con entity_name
   const accounts = (data ?? []).map((row: Record<string, unknown>) => {
     const member = row.members as { first_name: string; last_name: string; member_number: string } | null
     const supplier = row.suppliers as { name: string } | null
