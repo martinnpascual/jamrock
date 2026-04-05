@@ -90,7 +90,7 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar tipo..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent alignItemWithTrigger={false}>
                 <SelectItem value="socio">Socio</SelectItem>
                 <SelectItem value="proveedor">Proveedor</SelectItem>
               </SelectContent>
@@ -105,9 +105,9 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar socio..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false}>
                   {members.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
+                    <SelectItem key={m.id} value={m.id} label={`${m.first_name} ${m.last_name}`}>
                       {m.first_name} {m.last_name}
                       <span className="text-slate-400 ml-2 font-mono text-xs">{m.member_number}</span>
                     </SelectItem>
@@ -125,9 +125,9 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar proveedor..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false}>
                   {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+                    <SelectItem key={s.id} value={s.id} label={s.name}>
                       {s.name}
                     </SelectItem>
                   ))}

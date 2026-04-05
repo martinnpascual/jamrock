@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createAccountSchema, accountFiltersSchema } from '@/lib/validations/current-accounts'
 
 // GET /api/current-accounts — lista cuentas con filtros
@@ -108,9 +107,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ya existe una cuenta corriente activa para esta entidad' }, { status: 409 })
   }
 
-  // Admin client para el INSERT (necesita service_role para los triggers)
-  const admin = createAdminClient()
-  const { data, error } = await admin
+  // Cookie client — RLS cubre gerente (ALL) y secretaria (INSERT)
+  const { data, error } = await supabase
     .from('current_accounts')
     .insert({ ...parsed.data, created_by: user.id })
     .select()
