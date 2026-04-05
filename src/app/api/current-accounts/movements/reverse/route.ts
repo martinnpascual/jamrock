@@ -28,10 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
-  const admin = createAdminClient()
-
-  // Obtener movimiento original
-  const { data: original } = await admin
+  // Usar supabase (cookie auth) para lecturas — RLS gerente cubre
+  const { data: original } = await supabase
     .from('current_account_movements')
     .select('*')
     .eq('id', parsed.data.movement_id)
@@ -41,8 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
   }
 
-  // Verificar que no haya sido ya revertido
-  const { data: existingReversal } = await admin
+  const { data: existingReversal } = await supabase
     .from('current_account_movements')
     .select('id')
     .eq('reverses_id', original.id)
@@ -52,9 +49,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Este movimiento ya fue revertido' }, { status: 409 })
   }
 
-  // Crear movimiento opuesto
   const reversal_type = original.movement_type === 'credito' ? 'debito' : 'credito'
 
+  // Admin solo para INSERT
+  const admin = createAdminClient()
   const { data, error } = await admin
     .from('current_account_movements')
     .insert({

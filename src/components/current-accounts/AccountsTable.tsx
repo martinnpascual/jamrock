@@ -3,12 +3,14 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useCurrentAccounts } from '@/hooks/useCurrentAccounts'
+import { useRole } from '@/hooks/useRole'
 import { BalanceBadge } from './BalanceBadge'
+import { NewAccountModal } from './NewAccountModal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Wallet, ArrowDownUp } from 'lucide-react'
+import { Search, Eye, Wallet, ArrowDownUp, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AccountFilters } from '@/types/current-accounts'
 
@@ -29,6 +31,9 @@ export function AccountsTable() {
   const [search, setSearch] = useState('')
   const [balanceFilter, setBalanceFilter] = useState('all')
   const [entityFilter, setEntityFilter] = useState('all')
+  const [showNewAccount, setShowNewAccount] = useState(false)
+  const { role } = useRole()
+  const canCreate = role === 'gerente' || role === 'secretaria'
 
   const filters: AccountFilters = {
     ...(entityFilter !== 'all' ? { entity_type: entityFilter as 'socio' | 'proveedor' } : {}),
@@ -60,7 +65,7 @@ export function AccountsTable() {
 
   return (
     <div className="space-y-4">
-      {/* Header + search */}
+      {/* Header + search + CTA */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -71,6 +76,15 @@ export function AccountsTable() {
             className="pl-9 h-10"
           />
         </div>
+        {canCreate && (
+          <Button
+            onClick={() => setShowNewAccount(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva cuenta
+          </Button>
+        )}
       </div>
 
       {/* Filtros por tipo de entidad */}
@@ -173,6 +187,11 @@ export function AccountsTable() {
           </div>
         </div>
       )}
+
+      <NewAccountModal
+        open={showNewAccount}
+        onClose={() => setShowNewAccount(false)}
+      />
     </div>
   )
 }

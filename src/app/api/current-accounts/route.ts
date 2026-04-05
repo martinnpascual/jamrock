@@ -98,18 +98,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
-  const admin = createAdminClient()
-
-  // Verificar que no exista ya una CC activa para esta entidad
+  // Usar supabase (cookie auth) para el check de duplicado — RLS lo cubre
   const checkQuery = parsed.data.entity_type === 'socio'
-    ? admin.from('current_accounts').select('id').eq('member_id', parsed.data.member_id!).eq('is_deleted', false)
-    : admin.from('current_accounts').select('id').eq('supplier_id', parsed.data.supplier_id!).eq('is_deleted', false)
+    ? supabase.from('current_accounts').select('id').eq('member_id', parsed.data.member_id!).eq('is_deleted', false)
+    : supabase.from('current_accounts').select('id').eq('supplier_id', parsed.data.supplier_id!).eq('is_deleted', false)
 
   const { data: existing } = await checkQuery.maybeSingle()
   if (existing) {
     return NextResponse.json({ error: 'Ya existe una cuenta corriente activa para esta entidad' }, { status: 409 })
   }
 
+  // Admin client para el INSERT (necesita service_role para los triggers)
+  const admin = createAdminClient()
   const { data, error } = await admin
     .from('current_accounts')
     .insert({ ...parsed.data, created_by: user.id })
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    console.error('current-accounts POST error:', error.code)
+    console.error('current-accounts POST error:', error.message, error.code)
     return NextResponse.json({ error: 'Error al crear cuenta' }, { status: 500 })
   }
 

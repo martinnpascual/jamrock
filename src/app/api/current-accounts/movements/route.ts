@@ -28,10 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 422 })
   }
 
-  const admin = createAdminClient()
-
-  // Verificar cuenta
-  const { data: account } = await admin
+  // Verificar cuenta con supabase (cookie auth — RLS cubre lectura)
+  const { data: account } = await supabase
     .from('current_accounts')
     .select('id')
     .eq('id', parsed.data.account_id)
@@ -42,6 +40,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Cuenta corriente no encontrada' }, { status: 404 })
   }
 
+  // Admin para el INSERT (trigger BEFORE INSERT necesita service_role)
+  const admin = createAdminClient()
   const { data, error } = await admin
     .from('current_account_movements')
     .insert({
