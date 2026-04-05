@@ -70,7 +70,7 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ArrowDownUp className="w-4 h-4 text-indigo-600" />
+            <ArrowDownUp className="w-4 h-4 text-green-600" />
             Nueva cuenta corriente
           </DialogTitle>
         </DialogHeader>
@@ -154,7 +154,7 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
           <Button
             onClick={handleSubmit}
             disabled={!isValid || createMutation.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
           >
             {createMutation.isPending ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>

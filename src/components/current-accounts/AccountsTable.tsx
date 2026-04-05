@@ -9,8 +9,7 @@ import { NewAccountModal } from './NewAccountModal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Wallet, ArrowDownUp, Plus } from 'lucide-react'
+import { Search, Eye, Users, Building2, ArrowDownUp, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AccountFilters } from '@/types/current-accounts'
 
@@ -79,7 +78,7 @@ export function AccountsTable() {
         {canCreate && (
           <Button
             onClick={() => setShowNewAccount(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 flex-shrink-0"
+            className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10 flex-shrink-0 shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Nueva cuenta
@@ -132,27 +131,34 @@ export function AccountsTable() {
       {accounts.length === 0 ? (
         <EmptyState hasFilter={!!search || balanceFilter !== 'all' || entityFilter !== 'all'} />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 uppercase tracking-wide">
+        <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-sm">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-slate-50/60 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wider">
             <span>Titular</span>
             <span>Tipo</span>
             <span>N° Cuenta</span>
             <span>Saldo</span>
             <span>Acciones</span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100/80">
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3.5 hover:bg-slate-50 transition-colors items-center"
+                className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors items-center"
               >
                 {/* Titular */}
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-slate-500">
-                    <Wallet className="w-4 h-4" />
+                  <div className={cn(
+                    'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
+                    account.entity_type === 'socio'
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-sky-50 text-sky-600'
+                  )}>
+                    {account.entity_type === 'socio'
+                      ? <Users className="w-4 h-4" />
+                      : <Building2 className="w-4 h-4" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-800">{account.entity_name ?? '—'}</p>
+                    <p className="text-sm font-semibold text-slate-800">{account.entity_name ?? '—'}</p>
                     {account.last_movement_at && (
                       <p className="text-xs text-slate-400">
                         Último mov: {new Date(account.last_movement_at).toLocaleDateString('es-AR')}
@@ -162,12 +168,17 @@ export function AccountsTable() {
                 </div>
 
                 {/* Tipo */}
-                <Badge variant="outline" className="text-xs w-fit capitalize">
+                <span className={cn(
+                  'inline-flex items-center w-fit px-2.5 py-1 rounded-full text-xs font-medium border',
+                  account.entity_type === 'socio'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-sky-50 text-sky-700 border-sky-200'
+                )}>
                   {account.entity_type === 'socio' ? 'Socio' : 'Proveedor'}
-                </Badge>
+                </span>
 
                 {/* N° Cuenta */}
-                <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded w-fit">
+                <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg w-fit tracking-wide">
                   {account.account_number}
                 </span>
 

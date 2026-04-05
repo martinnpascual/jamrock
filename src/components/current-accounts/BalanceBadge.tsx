@@ -10,10 +10,10 @@ export function BalanceBadge({ balance, className }: BalanceBadgeProps) {
   const isNegative = balance < 0
 
   const style = isPositive
-    ? 'bg-green-50 text-green-800 border-green-200'
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100'
     : isNegative
-      ? 'bg-red-50 text-red-800 border-red-200'
-      : 'bg-slate-50 text-slate-600 border-slate-200'
+      ? 'bg-red-50 text-red-700 border-red-200 ring-red-100'
+      : 'bg-slate-100 text-slate-500 border-slate-200'
 
   const formatted = new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -24,13 +24,13 @@ export function BalanceBadge({ balance, className }: BalanceBadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border',
+        'inline-flex items-center gap-0.5 px-2.5 py-1 rounded-lg text-xs font-bold border tabular-nums',
         style,
         className
       )}
     >
-      {isNegative && '−'}
-      {isPositive && '+'}
+      {isNegative && <span className="opacity-70">−</span>}
+      {isPositive && <span className="opacity-70">+</span>}
       {formatted}
     </span>
   )

@@ -56,7 +56,8 @@ const config: Config = {
         sm: "4px",
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ['var(--font-sans)', 'sans-serif'],
+        heading: ['var(--font-heading)', 'sans-serif'],
       },
     },
   },

@@ -53,15 +53,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   )
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-slate-900 flex flex-col h-screen">
+    <aside className="w-64 flex-shrink-0 bg-[#0d1a0e] flex flex-col h-screen border-r border-white/5">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
-        <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <Leaf className="w-5 h-5 text-white" />
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/8">
+        <div className="w-9 h-9 bg-gradient-to-br from-green-400 to-green-700 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-green-900/50">
+          <Leaf className="w-5 h-5 text-white drop-shadow" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-slate-100 font-semibold text-sm leading-tight">Jamrock Club</p>
-          <p className="text-slate-400 text-xs leading-tight">Gestión interna</p>
+          <p className="text-white font-heading font-bold text-sm leading-tight tracking-tight">Jamrock Club</p>
+          <p className="text-slate-500 text-xs leading-tight">Gestión interna</p>
         </div>
         {/* Close button — mobile only */}
         {onClose && (
@@ -76,11 +76,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-none">
         {loading ? (
           <div className="space-y-1">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-10 bg-slate-800 rounded-lg animate-pulse" />
+              <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : (
@@ -92,16 +92,16 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   isActive
-                    ? 'bg-slate-800 text-slate-100'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-green-900/50 text-green-100 shadow-sm ring-1 ring-green-800/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 )}
               >
-                <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-green-400' : '')} />
+                <Icon className={cn('w-4 h-4 flex-shrink-0 transition-colors', isActive ? 'text-green-400' : 'text-slate-500')} />
                 {item.label}
                 {isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 bg-green-400 rounded-full" />
+                  <span className="ml-auto w-1.5 h-1.5 bg-green-400 rounded-full shadow-sm shadow-green-400/50" />
                 )}
               </Link>
             )
@@ -110,15 +110,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       </nav>
 
       {/* Footer: usuario + logout */}
-      <div className="px-3 py-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
-          <div className="w-8 h-8 bg-green-700 rounded-full flex items-center justify-center flex-shrink-0">
+      <div className="px-3 py-4 border-t border-white/8">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-white/3">
+          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-800 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
             <span className="text-white text-xs font-bold">
               {displayName !== '...' ? displayName.charAt(0).toUpperCase() : '?'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-slate-200 text-xs font-medium truncate">{displayName}</p>
+            <p className="text-slate-200 text-xs font-semibold truncate">{displayName}</p>
             <p className="text-slate-500 text-xs capitalize">{role || '...'}</p>
           </div>
           <form action="/api/auth/signout" method="POST">
