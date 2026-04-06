@@ -38,12 +38,12 @@ export default function VentasPage() {
         <h2 className="text-lg font-semibold text-foreground">Ventas y stock comercial</h2>
         <p className="text-sm text-muted-foreground mt-0.5">Productos, ventas y cierre de caja diario</p>
       </div>
-      <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit border border-white/[0.06]">
+      <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-full sm:w-fit border border-white/[0.06]">
         {TABS.map(({ id, label, Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all',
+            className={cn('flex flex-1 sm:flex-none items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all',
               tab === id ? 'bg-[#151515] text-white shadow-sm border border-white/[0.06]' : 'text-slate-500 hover:text-slate-300')}>
-            <Icon className="w-4 h-4" />{label}
+            <Icon className="w-4 h-4" /><span>{label}</span>
           </button>
         ))}
       </div>
@@ -75,8 +75,8 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   if (isLoading) return <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[#2DC814]/5 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Ventas hoy</p><p className="text-2xl font-bold text-[#2DC814] mt-1">{ARS(totalHoy)}</p></div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="col-span-2 sm:col-span-1 bg-[#2DC814]/5 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Ventas hoy</p><p className="text-2xl font-bold text-[#2DC814] mt-1">{ARS(totalHoy)}</p></div>
         <div className="bg-sky-900/20 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Transacciones hoy</p><p className="text-2xl font-bold text-sky-400 mt-1">{todaySales.length}</p></div>
         <div className="bg-white/5 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Total registros</p><p className="text-2xl font-bold text-slate-300 mt-1">{sales.length}</p></div>
       </div>
@@ -91,14 +91,24 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
               const prod = (Array.isArray(s.commercial_products) ? s.commercial_products[0] : s.commercial_products) as { name: string } | null
               const mem = (Array.isArray(s.members) ? s.members[0] : s.members) as { first_name: string; last_name: string } | null
               return (
-                <div key={s.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-3 items-center hover:bg-white/[0.03] group transition-colors">
-                  <div><p className="text-sm font-medium text-slate-200">{prod?.name ?? '—'}</p><p className="text-xs text-slate-500">{s.quantity} u. × {ARS(s.unit_price)}</p></div>
-                  <p className="text-xs text-slate-400">{mem ? `${mem.first_name} ${mem.last_name}` : '—'}</p>
-                  <Badge variant="outline" className="w-fit text-xs capitalize border-white/10 text-slate-400">{s.payment_method ?? '—'}</Badge>
-                  <p className="text-sm font-semibold text-[#2DC814]">{ARS(s.total)}</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}</p>
-                    {isGerente && <button onClick={() => deleteSale.mutate(s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>}
+                <div key={s.id} className="px-4 py-3 hover:bg-white/[0.02] group transition-colors">
+                  {/* Mobile layout */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-200 truncate">{prod?.name ?? '—'}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {s.quantity} u. × {ARS(s.unit_price)}
+                        {mem && <span className="ml-2 text-slate-600">· {mem.first_name} {mem.last_name}</span>}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs capitalize border-white/10 text-slate-400">{s.payment_method ?? '—'}</Badge>
+                        <span className="text-xs text-slate-500">{new Date(s.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <p className="text-sm font-bold text-[#2DC814]">{ARS(s.total)}</p>
+                      {isGerente && <button onClick={() => deleteSale.mutate(s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    </div>
                   </div>
                 </div>
               )
@@ -167,9 +177,9 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-sky-900/20 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500">Total</p><p className="text-2xl font-bold text-sky-400 mt-1">{products.length}</p></div>
-        <div className="bg-amber-900/20 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500">Stock bajo</p><p className="text-2xl font-bold text-amber-400 mt-1">{low}</p></div>
-        <div className="bg-red-950/40 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500">Sin stock</p><p className="text-2xl font-bold text-red-400 mt-1">{empty}</p></div>
+        <div className="bg-sky-900/20 border border-white/[0.06] rounded-lg p-3 sm:p-4"><p className="text-xs text-slate-500">Total</p><p className="text-xl sm:text-2xl font-bold text-sky-400 mt-1">{products.length}</p></div>
+        <div className="bg-amber-900/20 border border-white/[0.06] rounded-lg p-3 sm:p-4"><p className="text-xs text-slate-500">Stock bajo</p><p className="text-xl sm:text-2xl font-bold text-amber-400 mt-1">{low}</p></div>
+        <div className="bg-red-950/40 border border-white/[0.06] rounded-lg p-3 sm:p-4"><p className="text-xs text-slate-500">Sin stock</p><p className="text-xl sm:text-2xl font-bold text-red-400 mt-1">{empty}</p></div>
       </div>
       {isGerente && <div className="flex justify-end"><Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10"><Plus className="w-4 h-4" />Nuevo producto</Button></div>}
       {products.length === 0
@@ -260,9 +270,9 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
   return (
     <div className="space-y-5 max-w-2xl">
       <div className={cn('rounded-xl border p-6', reg && !isClosed ? 'bg-[#2DC814]/5 border-[#2DC814]/20' : 'bg-white/5 border-white/[0.06]')}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className={cn('w-10 h-10 rounded-full flex items-center justify-center', reg && !isClosed ? 'bg-[#2DC814]/20' : 'bg-white/10')}>
+            <div className={cn('w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0', reg && !isClosed ? 'bg-[#2DC814]/20' : 'bg-white/10')}>
               {isClosed ? <Lock className="w-5 h-5 text-slate-400" /> : <DollarSign className={cn('w-5 h-5', reg ? 'text-[#2DC814]' : 'text-slate-400')} />}
             </div>
             <div>
@@ -270,9 +280,11 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
               <p className="text-xs text-slate-500">{data?.today && new Date(data.today + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             </div>
           </div>
-          {!reg && isGerente && <Button onClick={onOpen} disabled={openReg.isPending} className="bg-green-600 hover:bg-green-700 text-white h-9 gap-1.5">{openReg.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Abrir caja</Button>}
-          {reg && !isClosed && isGerente && <Button onClick={() => setShowClose(true)} variant="outline" className="h-9 gap-1.5"><Lock className="w-4 h-4" />Cerrar caja</Button>}
-          {isClosed && <Badge variant="outline" className="text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10 gap-1"><CheckCircle className="w-3.5 h-3.5" />Cerrada</Badge>}
+          <div className="flex-shrink-0">
+            {!reg && isGerente && <Button onClick={onOpen} disabled={openReg.isPending} className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold h-9 gap-1.5">{openReg.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Abrir caja</Button>}
+            {reg && !isClosed && isGerente && <Button onClick={() => setShowClose(true)} variant="outline" className="h-9 gap-1.5"><Lock className="w-4 h-4" />Cerrar caja</Button>}
+            {isClosed && <Badge variant="outline" className="text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10 gap-1"><CheckCircle className="w-3.5 h-3.5" />Cerrada</Badge>}
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -326,7 +338,7 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-[#1a1a1a] border border-[#2DC814]/30 rounded-xl shadow-2xl px-5 py-3 z-50 flex items-center gap-3">
+        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 bg-[#1a1a1a] border border-[#2DC814]/30 rounded-xl shadow-2xl px-5 py-3 z-50 flex items-center gap-3">
           <CheckCircle className="w-5 h-5 text-[#2DC814]" />
           <p className="text-sm font-semibold text-slate-100">{toast}</p>
         </div>
