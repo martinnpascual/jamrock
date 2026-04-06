@@ -229,10 +229,29 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
   const openReg = useOpenCashRegister()
   const closeReg = useCloseCashRegister()
   const [showClose, setShowClose] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<CashRegisterCloseData>({ resolver: zodResolver(cashRegisterCloseSchema) })
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  async function onOpen() {
+    try {
+      await openReg.mutateAsync()
+      showToast('Caja abierta')
+    } catch { /**/ }
+  }
+
   async function onClose(d: CashRegisterCloseData) {
     if (!data?.register?.id) return
-    try { await closeReg.mutateAsync({ id: data.register.id, actual_total: d.actual_total, notes: d.notes }); reset(); setShowClose(false) } catch { /**/ }
+    try {
+      await closeReg.mutateAsync({ id: data.register.id, actual_total: d.actual_total, notes: d.notes })
+      reset()
+      setShowClose(false)
+      showToast('Caja cerrada')
+    } catch { /**/ }
   }
   if (isLoading) return <Skeleton className="h-48 w-full" />
   const reg = data?.register ?? null
@@ -251,7 +270,7 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
               <p className="text-xs text-slate-500">{data?.today && new Date(data.today + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             </div>
           </div>
-          {!reg && isGerente && <Button onClick={() => openReg.mutate()} disabled={openReg.isPending} className="bg-green-600 hover:bg-green-700 text-white h-9 gap-1.5">{openReg.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Abrir caja</Button>}
+          {!reg && isGerente && <Button onClick={onOpen} disabled={openReg.isPending} className="bg-green-600 hover:bg-green-700 text-white h-9 gap-1.5">{openReg.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Abrir caja</Button>}
           {reg && !isClosed && isGerente && <Button onClick={() => setShowClose(true)} variant="outline" className="h-9 gap-1.5"><Lock className="w-4 h-4" />Cerrar caja</Button>}
           {isClosed && <Badge variant="outline" className="text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10 gap-1"><CheckCircle className="w-3.5 h-3.5" />Cerrada</Badge>}
         </div>
@@ -301,6 +320,17 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {openReg.error && (
+        <p className="text-sm text-red-400 text-center">{(openReg.error as Error).message}</p>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 bg-[#1a1a1a] border border-[#2DC814]/30 rounded-xl shadow-2xl px-5 py-3 z-50 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-[#2DC814]" />
+          <p className="text-sm font-semibold text-slate-100">{toast}</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -13,9 +13,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Search,
   CheckCircle2,
@@ -186,6 +184,14 @@ export function DispensationFlow() {
     setTimeout(() => searchInputRef.current?.focus(), 100)
   }
 
+  // Helper: label del lote seleccionado
+  const selectedLotLabel = lotId === 'none'
+    ? 'Sin lote específico'
+    : (() => {
+        const lot = lots?.find(l => l.id === lotId)
+        return lot ? `${lot.genetics} — ${lot.current_grams}g disponibles` : 'Seleccioná lote'
+      })()
+
   // ─────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────
@@ -196,151 +202,143 @@ export function DispensationFlow() {
 
       {/* ── STEP: search ── */}
       {step === 'search' && (
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="pt-6 pb-6 space-y-5">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <QrCode className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-slate-800">Identificar socio</h3>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Escaneá el QR del carnet o ingresá el DNI
-              </p>
+        <div className="bg-[#111111] border border-white/[0.06] rounded-xl shadow-sm p-6 space-y-5">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-[#2DC814]/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <QrCode className="w-6 h-6 text-[#2DC814]" />
             </div>
+            <h3 className="font-semibold text-slate-100">Identificar socio</h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Escaneá el QR del carnet o ingresá el DNI
+            </p>
+          </div>
 
-            {/* Toggle QR/DNI */}
-            <div className="flex rounded-lg border border-slate-200 p-1 gap-1">
-              <button
-                onClick={() => { setSearchMode('qr'); setSearchQuery('') }}
-                className={cn(
-                  'flex-1 py-1.5 text-sm rounded-md font-medium transition-colors',
-                  searchMode === 'qr'
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                QR / Número socio
-              </button>
-              <button
-                onClick={() => { setSearchMode('text'); setSearchQuery('') }}
-                className={cn(
-                  'flex-1 py-1.5 text-sm rounded-md font-medium transition-colors',
-                  searchMode === 'text'
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                DNI
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  ref={searchInputRef}
-                  autoFocus
-                  placeholder={searchMode === 'qr' ? 'Escaneá QR o escribí SOC-0001' : 'Ingresá el DNI'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  className="pl-9 h-12 text-base"
-                  inputMode={searchMode === 'text' ? 'numeric' : 'text'}
-                />
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">
-                  <XCircle className="w-4 h-4 flex-shrink-0" />
-                  {error}
-                </div>
+          {/* Toggle QR/DNI */}
+          <div className="flex rounded-lg border border-white/[0.06] bg-white/5 p-1 gap-1">
+            <button
+              onClick={() => { setSearchMode('qr'); setSearchQuery('') }}
+              className={cn(
+                'flex-1 py-1.5 text-sm rounded-md font-medium transition-colors',
+                searchMode === 'qr'
+                  ? 'bg-white/10 text-slate-100'
+                  : 'text-slate-500 hover:text-slate-300'
               )}
+            >
+              QR / Número socio
+            </button>
+            <button
+              onClick={() => { setSearchMode('text'); setSearchQuery('') }}
+              className={cn(
+                'flex-1 py-1.5 text-sm rounded-md font-medium transition-colors',
+                searchMode === 'text'
+                  ? 'bg-white/10 text-slate-100'
+                  : 'text-slate-500 hover:text-slate-300'
+              )}
+            >
+              DNI
+            </button>
+          </div>
 
-              <Button
-                onClick={handleSearch}
-                disabled={!searchQuery.trim() || loading}
-                className="w-full h-12 bg-green-600 hover:bg-green-700 text-white text-base"
-              >
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Buscando...</>
-                ) : (
-                  <><Search className="w-4 h-4 mr-2" />Buscar socio</>
-                )}
-              </Button>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                ref={searchInputRef}
+                autoFocus
+                placeholder={searchMode === 'qr' ? 'Escaneá QR o escribí SOC-0001' : 'Ingresá el DNI'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                className="pl-9 h-12 text-base"
+                inputMode={searchMode === 'text' ? 'numeric' : 'text'}
+              />
             </div>
-          </CardContent>
-        </Card>
+
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg p-2.5">
+                <XCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <Button
+              onClick={handleSearch}
+              disabled={!searchQuery.trim() || loading}
+              className="w-full h-12 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold text-base"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Buscando...</>
+              ) : (
+                <><Search className="w-4 h-4 mr-2" />Buscar socio</>
+              )}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ── STEP: verify ── */}
       {step === 'verify' && verification?.member && (
         <div className="space-y-3">
           {/* Card del socio */}
-          <Card className="shadow-sm border-slate-200">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 text-lg font-bold text-green-700">
-                  {verification.member.first_name.charAt(0)}{verification.member.last_name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-800 text-lg leading-tight">
-                    {verification.member.first_name} {verification.member.last_name}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    DNI {verification.member.dni} · <span className="font-mono">{verification.member.member_number}</span>
-                  </p>
-                </div>
-                <User className="w-5 h-5 text-slate-300 flex-shrink-0" />
+          <div className="bg-[#111111] border border-white/[0.06] rounded-xl shadow-sm p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#2DC814]/10 rounded-full flex items-center justify-center flex-shrink-0 text-lg font-bold text-[#2DC814]">
+                {verification.member.first_name.charAt(0)}{verification.member.last_name.charAt(0)}
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-100 text-lg leading-tight">
+                  {verification.member.first_name} {verification.member.last_name}
+                </p>
+                <p className="text-sm text-slate-500">
+                  DNI {verification.member.dni} · <span className="font-mono">{verification.member.member_number}</span>
+                </p>
+              </div>
+              <User className="w-5 h-5 text-slate-600 flex-shrink-0" />
+            </div>
+          </div>
 
           {/* Resultado verificación */}
           {verification.verification?.allowed ? (
-            <Card className="shadow-sm border-green-200 bg-green-50">
-              <CardContent className="pt-5 pb-5 space-y-3">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-green-800">Habilitado para dispensar</p>
-                    <div className="mt-1">
-                      <StatusBadge status={verification.member.reprocann_status} />
-                    </div>
+            <div className="bg-[#2DC814]/5 border border-[#2DC814]/25 rounded-xl shadow-sm p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-[#2DC814] flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-slate-100">Habilitado para dispensar</p>
+                  <div className="mt-1">
+                    <StatusBadge status={verification.member.reprocann_status} />
                   </div>
                 </div>
+              </div>
 
-                {verification.month_stats && (
-                  <div className="flex gap-4 pt-2 border-t border-green-200">
-                    <div className="text-center">
-                      <p className="text-xl font-bold text-green-800">
-                        {verification.month_stats.total_grams.toFixed(1)}g
-                      </p>
-                      <p className="text-xs text-green-600">dispensado este mes</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xl font-bold text-green-800">
-                        {verification.month_stats.dispensation_count}
-                      </p>
-                      <p className="text-xs text-green-600">dispensas</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="shadow-sm border-red-200 bg-red-50">
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center gap-3">
-                  <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-red-800">Bloqueado — no puede dispensar</p>
-                    <p className="text-sm text-red-600 mt-0.5">
-                      {verification.verification?.reason ?? 'Verificá el estado del socio'}
+              {verification.month_stats && (
+                <div className="flex gap-4 pt-2 border-t border-white/[0.06]">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-[#2DC814]">
+                      {verification.month_stats.total_grams.toFixed(1)}g
                     </p>
+                    <p className="text-xs text-slate-500">dispensado este mes</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-[#2DC814]">
+                      {verification.month_stats.dispensation_count}
+                    </p>
+                    <p className="text-xs text-slate-500">dispensas</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
+          ) : (
+            <div className="bg-red-950/40 border border-red-900/50 rounded-xl shadow-sm p-5">
+              <div className="flex items-center gap-3">
+                <XCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-red-300">Bloqueado — no puede dispensar</p>
+                  <p className="text-sm text-red-400/80 mt-0.5">
+                    {verification.verification?.reason ?? 'Verificá el estado del socio'}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
           <div className="flex gap-3">
@@ -351,7 +349,7 @@ export function DispensationFlow() {
             <Button
               onClick={handleProceed}
               disabled={!verification.verification?.allowed}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2 h-11"
+              className="flex-1 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold gap-2 h-11"
             >
               Continuar
               <ArrowRight className="w-4 h-4" />
@@ -364,126 +362,126 @@ export function DispensationFlow() {
       {step === 'confirm' && verification?.member && (
         <div className="space-y-3">
           {/* Mini resumen del socio */}
-          <Card className="shadow-sm border-slate-200 bg-slate-50">
-            <CardContent className="pt-3 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-sm font-bold text-green-700">
-                  {verification.member.first_name.charAt(0)}{verification.member.last_name.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {verification.member.first_name} {verification.member.last_name}
-                  </p>
-                  <p className="text-xs text-slate-500">{verification.member.member_number}</p>
-                </div>
-                <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />
+          <div className="bg-[#111111] border border-white/[0.06] rounded-xl shadow-sm px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#2DC814]/10 rounded-full flex items-center justify-center text-sm font-bold text-[#2DC814]">
+                {verification.member.first_name.charAt(0)}{verification.member.last_name.charAt(0)}
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-sm font-semibold text-slate-100">
+                  {verification.member.first_name} {verification.member.last_name}
+                </p>
+                <p className="text-xs text-slate-500">{verification.member.member_number}</p>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-[#2DC814] ml-auto" />
+            </div>
+          </div>
 
           {/* Formulario dispensa */}
-          <Card className="shadow-sm border-slate-200">
-            <CardContent className="pt-5 pb-5 space-y-4">
-              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <Syringe className="w-4 h-4 text-slate-500" />
-                Datos de la dispensa
-              </h3>
+          <div className="bg-[#111111] border border-white/[0.06] rounded-xl shadow-sm p-5 space-y-4">
+            <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+              <Syringe className="w-4 h-4 text-slate-500" />
+              Datos de la dispensa
+            </h3>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Cantidad (gramos) *</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-400">Cantidad (gramos) *</Label>
+              <Input
+                autoFocus
+                type="number"
+                placeholder="Ej: 5"
+                min="0.1"
+                max="30"
+                step="0.5"
+                value={quantityGrams}
+                onChange={(e) => setQuantityGrams(e.target.value)}
+                className="h-12 text-lg font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-400">Genética *</Label>
+              {lots && lots.length > 0 ? (
+                <Select
+                  value={lotId}
+                  onValueChange={(v) => {
+                    const val = v ?? 'none'
+                    setLotId(val)
+                    if (val !== 'none') {
+                      const lot = lots.find((l) => l.id === val)
+                      if (lot) setGenetics(lot.genetics)
+                    } else {
+                      setGenetics('')
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-11 w-full">
+                    <span className={cn('flex-1 text-left text-sm', lotId === 'none' && !genetics ? 'text-muted-foreground' : 'text-slate-100')}>
+                      {selectedLotLabel}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin lote específico</SelectItem>
+                    {lots.map((lot) => (
+                      <SelectItem key={lot.id} value={lot.id}>
+                        {lot.genetics} — {lot.current_grams}g disponibles
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
                 <Input
-                  autoFocus
-                  type="number"
-                  placeholder="Ej: 5"
-                  min="0.1"
-                  max="30"
-                  step="0.5"
-                  value={quantityGrams}
-                  onChange={(e) => setQuantityGrams(e.target.value)}
-                  className="h-12 text-lg font-semibold"
+                  placeholder="Ej: OG Kush"
+                  value={genetics}
+                  onChange={(e) => setGenetics(e.target.value)}
+                  className="h-11"
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Genética *</Label>
-                {lots && lots.length > 0 ? (
-                  <Select
-                    value={lotId}
-                    onValueChange={(v) => {
-                      const val = v ?? 'none'
-                      setLotId(val)
-                      if (val !== 'none') {
-                        const lot = lots.find((l) => l.id === val)
-                        if (lot) setGenetics(lot.genetics)
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Seleccioná lote" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin lote específico</SelectItem>
-                      {lots.map((lot) => (
-                        <SelectItem key={lot.id} value={lot.id}>
-                          {lot.genetics} — {lot.current_grams}g disponibles
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    placeholder="Ej: OG Kush"
-                    value={genetics}
-                    onChange={(e) => setGenetics(e.target.value)}
-                    className="h-11"
-                  />
-                )}
-              </div>
-
-              {/* Si hay lote seleccionado pero quieren cambiar genética */}
-              {lotId !== 'none' && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Genética (editable)</Label>
-                  <Input
-                    value={genetics}
-                    onChange={(e) => setGenetics(e.target.value)}
-                    className="h-10"
-                  />
-                </div>
               )}
+            </div>
 
+            {/* Si hay lote seleccionado pero quieren cambiar genética */}
+            {lotId !== 'none' && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Notas (opcional)</Label>
+                <Label className="text-xs font-medium text-slate-400">Genética (editable)</Label>
                 <Input
-                  placeholder="Observaciones..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={genetics}
+                  onChange={(e) => setGenetics(e.target.value)}
                   className="h-10"
                 />
               </div>
+            )}
 
-              {/* Advertencia si supera el máximo mensual */}
-              {verification.month_stats &&
-                parseFloat(quantityGrams) > 0 &&
-                verification.month_stats.total_grams + parseFloat(quantityGrams) > 30 && (
-                  <div className="flex items-start gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>
-                      Esta dispensa llevaría al socio a{' '}
-                      <strong>{(verification.month_stats.total_grams + parseFloat(quantityGrams)).toFixed(1)}g</strong>{' '}
-                      este mes (máx. recomendado: 30g).
-                    </span>
-                  </div>
-                )}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-400">Notas (opcional)</Label>
+              <Input
+                placeholder="Observaciones..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="h-10"
+              />
+            </div>
 
-              {error && (
-                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">
-                  <XCircle className="w-4 h-4 flex-shrink-0" />
-                  {error}
+            {/* Advertencia si supera el máximo mensual */}
+            {verification.month_stats &&
+              parseFloat(quantityGrams) > 0 &&
+              verification.month_stats.total_grams + parseFloat(quantityGrams) > 30 && (
+                <div className="flex items-start gap-2 text-sm text-amber-400 bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Esta dispensa llevaría al socio a{' '}
+                    <strong>{(verification.month_stats.total_grams + parseFloat(quantityGrams)).toFixed(1)}g</strong>{' '}
+                    este mes (máx. recomendado: 30g).
+                  </span>
                 </div>
               )}
-            </CardContent>
-          </Card>
+
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg p-2.5">
+                <XCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setStep('verify')} className="gap-2">
@@ -493,7 +491,7 @@ export function DispensationFlow() {
             <Button
               onClick={handleSubmit}
               disabled={!quantityGrams || !genetics || loading}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12 text-base gap-2"
+              className="flex-1 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold h-12 text-base gap-2"
             >
               {loading ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Registrando...</>
@@ -507,41 +505,39 @@ export function DispensationFlow() {
 
       {/* ── STEP: done ── */}
       {step === 'done' && (
-        <Card className="shadow-sm border-green-200 bg-green-50">
-          <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-9 h-9 text-green-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-green-800">Dispensa registrada</h3>
-              {dispensationNumber && (
-                <p className="font-mono text-2xl font-bold text-green-700 mt-1">
-                  {dispensationNumber}
-                </p>
-              )}
-              <p className="text-sm text-green-600 mt-2">
-                {quantityGrams}g de {genetics} para{' '}
-                {verification?.member?.first_name} {verification?.member?.last_name}
+        <div className="bg-[#2DC814]/5 border border-[#2DC814]/25 rounded-xl shadow-sm p-8 text-center space-y-4">
+          <div className="w-16 h-16 bg-[#2DC814]/15 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-9 h-9 text-[#2DC814]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-100">Dispensa registrada</h3>
+            {dispensationNumber && (
+              <p className="font-mono text-2xl font-bold text-[#2DC814] mt-1">
+                {dispensationNumber}
               </p>
-            </div>
+            )}
+            <p className="text-sm text-slate-400 mt-2">
+              {quantityGrams}g de {genetics} para{' '}
+              {verification?.member?.first_name} {verification?.member?.last_name}
+            </p>
+          </div>
 
-            <div className="flex gap-3 justify-center pt-2">
-              <Button
-                onClick={handleReset}
-                className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              >
-                <Syringe className="w-4 h-4" />
-                Nueva dispensa
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/dispensas')}
-              >
-                Ver historial
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex gap-3 justify-center pt-2">
+            <Button
+              onClick={handleReset}
+              className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold gap-2"
+            >
+              <Syringe className="w-4 h-4" />
+              Nueva dispensa
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dispensas')}
+            >
+              Ver historial
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -570,16 +566,16 @@ function StepIndicator({ step }: { step: Step }) {
               <div
                 className={cn(
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
-                  isDone ? 'bg-green-500 text-white' :
-                  isActive ? 'bg-slate-800 text-white ring-2 ring-slate-300 ring-offset-2' :
-                  'bg-slate-100 text-slate-400'
+                  isDone ? 'bg-[#2DC814] text-black' :
+                  isActive ? 'bg-white/10 text-slate-100 ring-2 ring-white/20 ring-offset-2 ring-offset-[#0c0c0c]' :
+                  'bg-white/[0.06] text-slate-500'
                 )}
               >
                 {isDone ? '✓' : i + 1}
               </div>
               <span className={cn(
                 'text-xs font-medium',
-                isActive ? 'text-slate-800' : 'text-slate-400'
+                isActive ? 'text-slate-100' : 'text-slate-500'
               )}>
                 {s.label}
               </span>
@@ -587,7 +583,7 @@ function StepIndicator({ step }: { step: Step }) {
             {i < STEPS.length - 1 && (
               <div className={cn(
                 'w-12 h-0.5 mb-4 mx-1 transition-all',
-                i < currentIndex ? 'bg-green-400' : 'bg-slate-200'
+                i < currentIndex ? 'bg-[#2DC814]' : 'bg-white/[0.06]'
               )} />
             )}
           </div>
