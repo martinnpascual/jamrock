@@ -111,8 +111,8 @@ export function MembersTable() {
             className={cn(
               'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
               statusFilter === f.value
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                ? 'bg-[#2DC814]/10 text-[#C8FF1C] border-[#2DC814]/30'
+                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/20 hover:text-slate-300'
             )}
           >
             {f.label}
@@ -132,9 +132,9 @@ export function MembersTable() {
       {filtered.length === 0 ? (
         <EmptyState hasSearch={!!search || statusFilter !== 'all'} />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
           {/* Header de tabla (oculto en mobile, visible en tablet+) */}
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
             <span>Socio</span>
             <span>N° Socio</span>
             <span>REPROCANN</span>
@@ -143,7 +143,7 @@ export function MembersTable() {
           </div>
 
           {/* Filas */}
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-white/[0.04]">
             {filtered.map((member) => (
               <MemberRow
                 key={member.id}
@@ -168,21 +168,21 @@ function MemberRow({
   const fullName = `${member.first_name} ${member.last_name}`
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3.5 hover:bg-slate-50 transition-colors items-center">
+    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3.5 hover:bg-white/[0.03] transition-colors items-center">
       {/* Nombre + DNI */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-slate-600">
+        <div className="w-9 h-9 bg-[#2DC814]/10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-[#2DC814]">
           {member.first_name.charAt(0)}{member.last_name.charAt(0)}
         </div>
         <div>
-          <p className="text-sm font-medium text-slate-800">{fullName}</p>
+          <p className="text-sm font-medium text-slate-100">{fullName}</p>
           <p className="text-xs text-slate-400">DNI {member.dni}</p>
         </div>
       </div>
 
       {/* N° Socio */}
       <div>
-        <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+        <span className="font-mono text-xs font-semibold text-slate-300 bg-white/5 border border-white/[0.06] px-2 py-0.5 rounded">
           {member.member_number}
         </span>
       </div>
@@ -237,17 +237,17 @@ function MemberRow({
 function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-        <Users className="w-6 h-6 text-slate-400" />
+      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+        <Users className="w-6 h-6 text-slate-500" />
       </div>
       {hasSearch ? (
         <>
-          <p className="text-sm font-medium text-slate-700">Sin resultados</p>
-          <p className="text-xs text-slate-400 mt-1">Probá con otro nombre, DNI o filtro.</p>
+          <p className="text-sm font-medium text-slate-300">Sin resultados</p>
+          <p className="text-xs text-slate-500 mt-1">Probá con otro nombre, DNI o filtro.</p>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-slate-700">No hay socios registrados</p>
+          <p className="text-sm font-medium text-slate-300">No hay socios registrados</p>
           <p className="text-xs text-slate-400 mt-1 mb-4">Empezá dando de alta al primer socio.</p>
           <Link href="/socios/nuevo">
             <Button className="bg-green-600 hover:bg-green-700 text-white gap-2" size="sm">

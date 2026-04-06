@@ -138,7 +138,7 @@ export default function SolicitudesPage() {
     <div className="space-y-5 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Solicitudes de inscripción</h2>
+          <h2 className="text-lg font-semibold text-foreground">Solicitudes de inscripción</h2>
           <p className="text-sm text-slate-500 mt-0.5">
             {pendienteCount > 0 ? `${pendienteCount} pendiente(s) de revisión` : 'Sin solicitudes pendientes'}
           </p>
@@ -173,8 +173,8 @@ export default function SolicitudesPage() {
               className={cn(
                 'px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors',
                 statusFilter === s
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#2DC814]/10 text-[#C8FF1C] border-[#2DC814]/30 border'
+                  : 'bg-transparent border border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-300'
               )}
             >
               {s}
@@ -186,10 +186,10 @@ export default function SolicitudesPage() {
       {/* Lista */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-            <ClipboardList className="w-6 h-6 text-slate-400" />
+          <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+            <ClipboardList className="w-6 h-6 text-slate-500" />
           </div>
-          <p className="text-sm font-medium text-slate-700">Sin solicitudes</p>
+          <p className="text-sm font-medium text-slate-300">Sin solicitudes</p>
           <p className="text-xs text-slate-400 mt-1">
             {statusFilter === 'pendiente' ? 'No hay solicitudes pendientes por revisar.' : 'No hay solicitudes con ese filtro.'}
           </p>
@@ -278,11 +278,11 @@ export default function SolicitudesPage() {
 
       {/* Toast aprobación exitosa */}
       {approvedMember && (
-        <div className="fixed bottom-6 right-6 bg-white border border-green-300 rounded-xl shadow-lg p-4 max-w-sm z-50">
+        <div className="fixed bottom-6 right-6 bg-[#1a1a1a] border border-[#2DC814]/30 rounded-xl shadow-2xl p-4 max-w-sm z-50">
           <div className="flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <CheckCircle className="w-5 h-5 text-[#2DC814] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-slate-800">Socio creado exitosamente</p>
+              <p className="text-sm font-semibold text-slate-100">Socio creado exitosamente</p>
               <p className="text-xs text-slate-500 mt-0.5">
                 N° de socio: <span className="font-mono font-semibold">{approvedMember.member_number}</span>
               </p>
@@ -320,26 +320,26 @@ function RequestCard({
   const [expanded, setExpanded] = useState(false)
 
   const statusConfig = {
-    pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-    aprobada: { label: 'Aprobada', className: 'bg-green-100 text-green-700 border-green-200' },
-    rechazada: { label: 'Rechazada', className: 'bg-red-100 text-red-700 border-red-200' },
+    pendiente: { label: 'Pendiente', className: 'bg-amber-950/40 text-amber-400 border-amber-800/50' },
+    aprobada: { label: 'Aprobada', className: 'bg-[#2DC814]/10 text-[#2DC814] border-[#2DC814]/20' },
+    rechazada: { label: 'Rechazada', className: 'bg-red-950/40 text-red-400 border-red-900/50' },
   }
 
   const config = statusConfig[req.status]
 
   return (
     <div className={cn(
-      'bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm',
-      req.status === 'aprobada' && 'opacity-70'
+      'bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm',
+      req.status === 'aprobada' && 'opacity-60'
     )}>
       <div className="p-4 flex items-center justify-between gap-4">
         {/* Info principal */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-xs font-semibold text-slate-500 flex-shrink-0">
+          <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center text-xs font-semibold text-slate-400 flex-shrink-0">
             {req.first_name.charAt(0)}{req.last_name.charAt(0)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800 truncate">
+            <p className="text-sm font-semibold text-slate-100 truncate">
               {req.first_name} {req.last_name}
             </p>
             <p className="text-xs text-slate-400">
@@ -389,7 +389,7 @@ function RequestCard({
 
       {/* Detalle expandible */}
       {expanded && (
-        <div className="border-t border-slate-100 px-4 py-3 bg-slate-50 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+        <div className="border-t border-white/[0.05] px-4 py-3 bg-white/[0.02] grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           {req.phone && <Detail label="Teléfono" value={req.phone} />}
           {req.birth_date && <Detail label="Nacimiento" value={new Date(req.birth_date).toLocaleDateString('es-AR')} />}
           {req.address && <Detail label="Dirección" value={req.address} />}
@@ -415,7 +415,7 @@ function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-slate-400 font-medium">{label}</p>
-      <p className="text-slate-700 mt-0.5">{value}</p>
+      <p className="text-slate-300 mt-0.5">{value}</p>
     </div>
   )
 }
