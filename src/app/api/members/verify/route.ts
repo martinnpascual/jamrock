@@ -22,8 +22,15 @@ export async function GET(request: NextRequest) {
   // Buscar socio
   let query = supabase.from('members').select('*').eq('is_deleted', false)
 
-  if (qr) query = query.eq('qr_code', qr)
-  else if (dni) query = query.eq('dni', dni)
+  if (qr) {
+    // Busca por qr_code primero, luego por member_number como fallback
+    const { data: byQr } = await supabase.from('members').select('*').eq('is_deleted', false).eq('qr_code', qr).single()
+    if (byQr) {
+      query = supabase.from('members').select('*').eq('is_deleted', false).eq('id', byQr.id)
+    } else {
+      query = query.eq('member_number', qr)
+    }
+  } else if (dni) query = query.eq('dni', dni)
   else if (memberId) query = query.eq('id', memberId)
 
   const { data: member, error } = await query.single()
