@@ -214,8 +214,8 @@ export default function SolicitudesPage() {
           <DialogHeader>
             <DialogTitle>Aprobar solicitud</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600">
-            ¿Confirmás la aprobación de <strong>{approveDialog?.name}</strong>? Se creará automáticamente como socio del club.
+          <p className="text-sm text-slate-400">
+            ¿Confirmás la aprobación de <strong className="text-slate-200">{approveDialog?.name}</strong>? Se creará automáticamente como socio del club.
           </p>
           {actionMutation.error && (
             <p className="text-sm text-red-500">{(actionMutation.error as Error).message}</p>
@@ -332,59 +332,63 @@ function RequestCard({
       'bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm',
       req.status === 'aprobada' && 'opacity-60'
     )}>
-      <div className="p-4 flex items-center justify-between gap-4">
-        {/* Info principal */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center text-xs font-semibold text-slate-400 flex-shrink-0">
-            {req.first_name.charAt(0)}{req.last_name.charAt(0)}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          {/* Info principal */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center text-xs font-semibold text-slate-400 flex-shrink-0">
+              {req.first_name.charAt(0)}{req.last_name.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-100 truncate">
+                {req.first_name} {req.last_name}
+              </p>
+              <p className="text-xs text-slate-400 truncate">
+                DNI {req.dni}
+                {req.email && <span className="hidden sm:inline"> · {req.email}</span>}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-100 truncate">
-              {req.first_name} {req.last_name}
+
+          {/* Right: badge + fecha + Más */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <p className="text-xs text-slate-500 hidden sm:block">
+              {new Date(req.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
             </p>
-            <p className="text-xs text-slate-400">
-              DNI {req.dni}
-              {req.email && ` · ${req.email}`}
-            </p>
+            <Badge className={cn('text-xs border', config.className)} variant="outline">
+              {config.label}
+            </Badge>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs text-slate-400 hover:text-slate-300 underline"
+            >
+              {expanded ? 'Menos' : 'Más'}
+            </button>
           </div>
         </div>
 
-        {/* Right: badge + fecha + acciones */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <p className="text-xs text-slate-400 hidden sm:block">
-            {new Date(req.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
-          </p>
-          <Badge className={cn('text-xs border', config.className)} variant="outline">
-            {config.label}
-          </Badge>
-          {req.status === 'pendiente' && canAct && (
-            <>
-              <Button
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 gap-1"
-                onClick={onApprove}
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-                Aprobar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-red-600 border-red-200 hover:bg-red-50 h-8 px-3 gap-1"
-                onClick={onReject}
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                Rechazar
-              </Button>
-            </>
-          )}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-xs text-slate-400 hover:text-slate-600 underline"
-          >
-            {expanded ? 'Menos' : 'Más'}
-          </button>
-        </div>
+        {/* Acciones — segunda fila en mobile cuando pendiente */}
+        {req.status === 'pendiente' && canAct && (
+          <div className="flex items-center gap-2 mt-3 sm:mt-2 pl-12">
+            <Button
+              size="sm"
+              className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold h-8 px-3 gap-1"
+              onClick={onApprove}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              Aprobar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-400 border-red-900/50 hover:bg-red-950/30 h-8 px-3 gap-1"
+              onClick={onReject}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Rechazar
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Detalle expandible */}
