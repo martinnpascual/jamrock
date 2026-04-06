@@ -95,8 +95,8 @@ export function AccountsTable() {
             className={cn(
               'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
               entityFilter === f.value
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                ? 'bg-[#2DC814]/10 text-[#C8FF1C] border-[#2DC814]/30'
+                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/20 hover:text-slate-300'
             )}
           >
             {f.label}
@@ -110,8 +110,8 @@ export function AccountsTable() {
             className={cn(
               'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
               balanceFilter === f.value
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                ? 'bg-[#2DC814]/10 text-[#C8FF1C] border-[#2DC814]/30'
+                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/20 hover:text-slate-300'
             )}
           >
             {f.label}
@@ -131,34 +131,34 @@ export function AccountsTable() {
       {accounts.length === 0 ? (
         <EmptyState hasFilter={!!search || balanceFilter !== 'all' || entityFilter !== 'all'} />
       ) : (
-        <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-sm">
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-slate-50/60 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="bg-[#111111] border border-white/[0.06] rounded-xl overflow-hidden shadow-sm">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-white/[0.03] border-b border-white/[0.05] text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <span>Titular</span>
             <span>Tipo</span>
             <span>N° Cuenta</span>
             <span>Saldo</span>
             <span>Acciones</span>
           </div>
-          <div className="divide-y divide-slate-100/80">
+          <div className="divide-y divide-white/[0.04]">
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors items-center"
+                className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors items-center"
               >
                 {/* Titular */}
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
                     account.entity_type === 'socio'
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'bg-sky-50 text-sky-600'
+                      ? 'bg-[#2DC814]/10 text-[#2DC814]'
+                      : 'bg-sky-900/30 text-sky-400'
                   )}>
                     {account.entity_type === 'socio'
                       ? <Users className="w-4 h-4" />
                       : <Building2 className="w-4 h-4" />}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">{account.entity_name ?? '—'}</p>
+                    <p className="text-sm font-semibold text-slate-100">{account.entity_name ?? '—'}</p>
                     {account.last_movement_at && (
                       <p className="text-xs text-slate-400">
                         Último mov: {new Date(account.last_movement_at).toLocaleDateString('es-AR')}
@@ -171,14 +171,14 @@ export function AccountsTable() {
                 <span className={cn(
                   'inline-flex items-center w-fit px-2.5 py-1 rounded-full text-xs font-medium border',
                   account.entity_type === 'socio'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-sky-50 text-sky-700 border-sky-200'
+                    ? 'bg-[#2DC814]/10 text-[#2DC814] border-[#2DC814]/20'
+                    : 'bg-sky-900/30 text-sky-400 border-sky-800/50'
                 )}>
                   {account.entity_type === 'socio' ? 'Socio' : 'Proveedor'}
                 </span>
 
                 {/* N° Cuenta */}
-                <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg w-fit tracking-wide">
+                <span className="font-mono text-xs font-bold text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg w-fit tracking-wide border border-white/[0.06]">
                   {account.account_number}
                 </span>
 
@@ -210,18 +210,18 @@ export function AccountsTable() {
 function EmptyState({ hasFilter }: { hasFilter: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-        <ArrowDownUp className="w-6 h-6 text-slate-400" />
+      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+        <ArrowDownUp className="w-6 h-6 text-slate-500" />
       </div>
       {hasFilter ? (
         <>
-          <p className="text-sm font-medium text-slate-700">Sin resultados</p>
-          <p className="text-xs text-slate-400 mt-1">Probá con otro filtro o búsqueda.</p>
+          <p className="text-sm font-medium text-slate-300">Sin resultados</p>
+          <p className="text-xs text-slate-500 mt-1">Probá con otro filtro o búsqueda.</p>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-slate-700">Sin cuentas corrientes</p>
-          <p className="text-xs text-slate-400 mt-1">Las cuentas se crean automáticamente al registrar pagos, compras o ventas.</p>
+          <p className="text-sm font-medium text-slate-300">Sin cuentas corrientes</p>
+          <p className="text-xs text-slate-500 mt-1">Las cuentas se crean automáticamente al registrar pagos, compras o ventas.</p>
         </>
       )}
     </div>

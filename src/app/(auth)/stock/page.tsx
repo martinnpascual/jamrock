@@ -52,7 +52,7 @@ export default function StockPage() {
     <div className="space-y-5 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Stock medicinal</h2>
+          <h2 className="text-lg font-semibold text-foreground">Stock medicinal</h2>
           <p className="text-sm text-slate-500 mt-0.5">
             {activeLots} lote(s) activo(s) · {totalGrams.toFixed(1)}g disponibles
           </p>
@@ -70,15 +70,15 @@ export default function StockPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Stock total" value={`${totalGrams.toFixed(0)}g`} color="text-green-600" bg="bg-green-50" />
-        <StatCard label="Lotes activos" value={activeLots} color="text-blue-600" bg="bg-blue-50" />
-        <StatCard label="Stock bajo (<50g)" value={lowLots} color="text-yellow-600" bg="bg-yellow-50" warn={lowLots > 0} />
-        <StatCard label="Lotes agotados" value={emptyLots} color="text-slate-500" bg="bg-slate-50" />
+        <StatCard label="Stock total" value={`${totalGrams.toFixed(0)}g`} color="text-[#2DC814]" bg="bg-[#2DC814]/5" />
+        <StatCard label="Lotes activos" value={activeLots} color="text-sky-400" bg="bg-sky-900/20" />
+        <StatCard label="Stock bajo (<50g)" value={lowLots} color="text-amber-400" bg="bg-amber-900/20" warn={lowLots > 0} />
+        <StatCard label="Lotes agotados" value={emptyLots} color="text-slate-500" bg="bg-white/5" />
       </div>
 
       {lowLots > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-          <p className="text-sm text-yellow-700 font-medium">
+        <div className="bg-amber-950/40 border border-amber-900/50 rounded-lg px-4 py-3">
+          <p className="text-sm text-amber-400 font-medium">
             ⚠️ {lowLots} lote(s) con menos de 50g — considerá reabastecerte.
           </p>
         </div>
@@ -123,18 +123,18 @@ function LotCard({
   const isEmpty = lot.current_grams <= 0
   const isLow = !isEmpty && lot.current_grams < 50
 
-  const barColor = isEmpty ? 'bg-slate-200' : isLow ? 'bg-yellow-400' : 'bg-green-500'
+  const barColor = isEmpty ? 'bg-white/10' : isLow ? 'bg-amber-400' : 'bg-[#2DC814]'
 
   return (
-    <div className={cn('bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden', isEmpty && 'opacity-60')}>
+    <div className={cn('bg-[#111111] border border-white/[0.06] rounded-lg shadow-sm overflow-hidden', isEmpty && 'opacity-50')}>
       <div className="p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', isEmpty ? 'bg-slate-100' : 'bg-green-100')}>
-              <Leaf className={cn('w-5 h-5', isEmpty ? 'text-slate-400' : 'text-green-600')} />
+            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', isEmpty ? 'bg-white/5' : 'bg-[#2DC814]/10')}>
+              <Leaf className={cn('w-5 h-5', isEmpty ? 'text-slate-500' : 'text-[#2DC814]')} />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-800 truncate">{lot.genetics}</p>
+              <p className="text-sm font-semibold text-slate-100 truncate">{lot.genetics}</p>
               <p className="text-xs text-slate-400">
                 {new Date(lot.lot_date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
                 {lot.cost_per_gram ? ` · $${lot.cost_per_gram}/g` : ''}
@@ -144,15 +144,15 @@ function LotCard({
 
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="text-right">
-              <p className="text-base font-bold text-slate-800">{lot.current_grams.toFixed(1)}g</p>
+              <p className="text-base font-bold text-slate-100">{lot.current_grams.toFixed(1)}g</p>
               <p className="text-xs text-slate-400">de {lot.initial_grams.toFixed(0)}g</p>
             </div>
             {isEmpty ? (
-              <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">Agotado</Badge>
+              <Badge variant="outline" className="text-xs text-slate-500 border-white/10 bg-white/5">Agotado</Badge>
             ) : isLow ? (
-              <Badge variant="outline" className="text-xs text-yellow-700 border-yellow-300 bg-yellow-50">Stock bajo</Badge>
+              <Badge variant="outline" className="text-xs text-amber-400 border-amber-800/50 bg-amber-950/40">Stock bajo</Badge>
             ) : (
-              <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">Activo</Badge>
+              <Badge variant="outline" className="text-xs text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10">Activo</Badge>
             )}
             <button onClick={onToggle} className="text-slate-400 hover:text-slate-600 p-1">
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -160,7 +160,7 @@ function LotCard({
           </div>
         </div>
 
-        <div className="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
           <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
         </div>
         <p className="text-xs text-slate-400 mt-1">
@@ -171,7 +171,7 @@ function LotCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
+        <div className="border-t border-white/[0.05] bg-white/[0.02] p-4 space-y-3">
           {lot.notes && <p className="text-xs text-slate-500 italic">&ldquo;{lot.notes}&rdquo;</p>}
 
           <div>
@@ -189,13 +189,13 @@ function LotCard({
                 {movements.map((m: any) => {
                   const member = Array.isArray(m.members) ? m.members[0] : m.members
                   return (
-                    <div key={m.dispensation_number} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0">
+                    <div key={m.dispensation_number} className="flex items-center justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
                       <div>
                         <span className="font-mono text-slate-500">{m.dispensation_number}</span>
-                        {member && <span className="text-slate-600 ml-2">{member.first_name} {member.last_name}</span>}
+                        {member && <span className="text-slate-400 ml-2">{member.first_name} {member.last_name}</span>}
                       </div>
                       <div className="text-right ml-4 flex-shrink-0">
-                        <span className={cn('font-semibold', m.type === 'anulacion' ? 'text-red-500' : 'text-slate-700')}>
+                        <span className={cn('font-semibold', m.type === 'anulacion' ? 'text-red-400' : 'text-slate-300')}>
                           {m.type === 'anulacion' ? '+' : '-'}{m.quantity_grams}g
                         </span>
                         <span className="text-slate-400 ml-2">
@@ -213,7 +213,7 @@ function LotCard({
             <Button
               size="sm"
               variant="outline"
-              className="text-red-500 border-red-200 hover:bg-red-50 h-8 gap-1.5 text-xs"
+              className="text-red-400 border-red-900/50 hover:bg-red-950/40 h-8 gap-1.5 text-xs"
               disabled={deleteMutation.isPending}
               onClick={() => deleteMutation.mutate(lot.id)}
             >

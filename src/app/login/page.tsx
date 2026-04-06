@@ -37,27 +37,27 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0c0c0c] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-md">
-            <Leaf className="w-7 h-7 text-white" />
+          <div className="w-12 h-12 bg-gradient-to-br from-[#2DC814] to-[#1a8a0c] rounded-xl flex items-center justify-center shadow-lg shadow-[#2DC814]/20">
+            <Leaf className="w-7 h-7 text-white drop-shadow" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Jamrock Club</h1>
+            <h1 className="text-2xl font-bold text-white font-heading">Jamrock Club</h1>
             <p className="text-sm text-slate-500">Sistema de gestión</p>
           </div>
         </div>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-xl border-white/[0.06] bg-[#151515]">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl text-slate-800">Iniciar sesión</CardTitle>
-            <CardDescription>Ingresá tus credenciales para acceder</CardDescription>
+            <CardTitle className="text-xl text-white">Iniciar sesión</CardTitle>
+            <CardDescription className="text-slate-500">Ingresá tus credenciales para acceder</CardDescription>
           </CardHeader>
           <CardContent>
             {(error || authError === 'unauthorized') && (
-              <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-950/50 border border-red-900/50 rounded-lg p-3 mb-4">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{error || 'Tu cuenta no tiene acceso o está inactiva.'}</span>
               </div>
@@ -94,7 +94,7 @@ function LoginForm() {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-medium"
+                className="w-full h-11 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold"
                 disabled={loading}
               >
                 {loading ? 'Ingresando...' : 'Ingresar'}
@@ -103,7 +103,7 @@ function LoginForm() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
+        <p className="text-center text-xs text-slate-600 mt-6">
           ¿Problemas para acceder? Contactá al gerente del club.
         </p>
       </div>

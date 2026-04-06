@@ -19,9 +19,9 @@ import { cn } from '@/lib/utils'
 
 const TYPE_LABELS = { medicinal: 'Medicinal', comercial: 'Comercial', ambos: 'Ambos' }
 const TYPE_COLORS = {
-  medicinal: 'bg-green-50 text-green-700 border-green-200',
-  comercial: 'bg-blue-50 text-blue-700 border-blue-200',
-  ambos: 'bg-purple-50 text-purple-700 border-purple-200',
+  medicinal: 'bg-[#2DC814]/10 text-[#2DC814] border-[#2DC814]/20',
+  comercial: 'bg-sky-900/30 text-sky-400 border-sky-800/50',
+  ambos: 'bg-violet-900/30 text-violet-400 border-violet-800/50',
 }
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
@@ -50,7 +50,7 @@ export default function ProveedoresPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Proveedores</h2>
+          <h2 className="text-lg font-semibold text-foreground">Proveedores</h2>
           <p className="text-sm text-slate-500 mt-0.5">{suppliers.length} proveedor(es) · {medCount} medicinal · {comCount} comercial</p>
         </div>
         {isGerente && (
@@ -128,14 +128,14 @@ function SupplierCard({ supplier: s, expanded, onToggle, isGerente }: { supplier
   const totalSpend = records.reduce((sum, r) => sum + (r.total_cost ?? 0), 0)
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-[#111111] border border-white/[0.06] rounded-lg shadow-sm overflow-hidden">
       <div className="p-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Truck className="w-4.5 h-4.5 text-slate-500" />
+          <div className="w-9 h-9 bg-white/5 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Truck className="w-4.5 h-4.5 text-slate-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800 truncate">{s.name}</p>
+            <p className="text-sm font-semibold text-slate-100 truncate">{s.name}</p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {s.contact_name && <span className="text-xs text-slate-400 flex items-center gap-1"><User className="w-3 h-3" />{s.contact_name}</span>}
               {s.phone && <span className="text-xs text-slate-400 flex items-center gap-1"><Phone className="w-3 h-3" />{s.phone}</span>}
@@ -157,25 +157,25 @@ function SupplierCard({ supplier: s, expanded, onToggle, isGerente }: { supplier
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
+        <div className="border-t border-white/[0.05] bg-white/[0.02] p-4 space-y-3">
           {s.notes && <p className="text-xs text-slate-500 italic">&ldquo;{s.notes}&rdquo;</p>}
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Historial de suministros {records.length > 0 && `· Total: ${ARS(totalSpend)}`}
             </p>
             {isLoading ? <Skeleton className="h-10 w-full" /> : records.length === 0 ? (
-              <p className="text-xs text-slate-400">Sin suministros registrados aún.</p>
+              <p className="text-xs text-slate-500">Sin suministros registrados aún.</p>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {records.map(r => (
-                  <div key={r.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0">
+                  <div key={r.id} className="flex items-center justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
                     <div>
-                      <p className="text-slate-700 font-medium">{r.description}</p>
-                      {r.quantity && <p className="text-slate-400">{r.quantity} unidades</p>}
+                      <p className="text-slate-300 font-medium">{r.description}</p>
+                      {r.quantity && <p className="text-slate-500">{r.quantity} unidades</p>}
                     </div>
                     <div className="text-right ml-4 flex-shrink-0">
-                      {r.total_cost ? <p className="font-semibold text-slate-700">{ARS(r.total_cost)}</p> : null}
-                      <p className="text-slate-400">{new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                      {r.total_cost ? <p className="font-semibold text-slate-200">{ARS(r.total_cost)}</p> : null}
+                      <p className="text-slate-500">{new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                     </div>
                   </div>
                 ))}

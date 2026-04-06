@@ -10,10 +10,10 @@ export function BalanceBadge({ balance, className }: BalanceBadgeProps) {
   const isNegative = balance < 0
 
   const style = isPositive
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100'
+    ? 'bg-[#2DC814]/10 text-[#2DC814] border-[#2DC814]/25'
     : isNegative
-      ? 'bg-red-50 text-red-700 border-red-200 ring-red-100'
-      : 'bg-slate-100 text-slate-500 border-slate-200'
+      ? 'bg-red-950/50 text-red-400 border-red-900/50'
+      : 'bg-white/5 text-slate-500 border-white/10'
 
   const formatted = new Intl.NumberFormat('es-AR', {
     style: 'currency',

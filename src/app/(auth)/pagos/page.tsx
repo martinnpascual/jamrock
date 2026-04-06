@@ -38,9 +38,9 @@ const METHOD_LABELS: Record<string, string> = {
 }
 
 const METHOD_COLORS: Record<string, string> = {
-  efectivo: 'bg-green-50 text-green-700 border-green-200',
-  transferencia: 'bg-blue-50 text-blue-700 border-blue-200',
-  mixto: 'bg-purple-50 text-purple-700 border-purple-200',
+  efectivo: 'bg-[#2DC814]/10 text-[#2DC814] border-[#2DC814]/20',
+  transferencia: 'bg-sky-900/30 text-sky-400 border-sky-800/50',
+  mixto: 'bg-violet-900/30 text-violet-400 border-violet-800/50',
 }
 
 export default function PagosPage() {
@@ -89,8 +89,8 @@ export default function PagosPage() {
     <div className="space-y-5 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Cuentas corrientes y pagos</h2>
-          <p className="text-sm text-slate-500 mt-0.5">{payments.length} registro(s) · últimos 200</p>
+          <h2 className="text-lg font-semibold text-foreground">Cuentas corrientes y pagos</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">{payments.length} registro(s) · últimos 200</p>
         </div>
         {canCreate && (
           <Button onClick={() => setShowForm(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10">
@@ -102,9 +102,9 @@ export default function PagosPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatCard label="Cobrado hoy" value={formatARS(totalHoy)} color="text-green-600" bg="bg-green-50" />
-        <StatCard label="Cobrado este mes" value={formatARS(totalMes)} color="text-blue-600" bg="bg-blue-50" />
-        <StatCard label="Total registros" value={payments.length} color="text-slate-600" bg="bg-slate-50" />
+        <StatCard label="Cobrado hoy" value={formatARS(totalHoy)} color="text-[#2DC814]" bg="bg-[#2DC814]/5" />
+        <StatCard label="Cobrado este mes" value={formatARS(totalMes)} color="text-sky-400" bg="bg-sky-900/20" />
+        <StatCard label="Total registros" value={payments.length} color="text-slate-300" bg="bg-white/5" />
       </div>
 
       {/* Filtro */}
@@ -122,15 +122,15 @@ export default function PagosPage() {
       {filtered.length === 0 ? (
         <EmptyState hasSearch={!!search} onAdd={() => setShowForm(true)} canCreate={canCreate} />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 uppercase tracking-wide">
+        <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
             <span>Socio</span>
             <span>Concepto</span>
             <span>Método</span>
             <span>Monto</span>
             <span>Fecha</span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-white/[0.04]">
             {filtered.map((p) => (
               <PaymentRow key={p.id} payment={p} canDelete={canDelete} onDelete={() => setDeleteConfirm({ id: p.id, amount: p.amount })} />
             ))}
@@ -154,15 +154,15 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
   const member = Array.isArray(p.members) ? (p.members as unknown[])[0] as typeof p.members : p.members
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3 items-center hover:bg-slate-50 group">
+    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3 items-center hover:bg-white/[0.03] group transition-colors">
       <div className="flex items-center gap-2.5">
         {member ? (
           <>
-            <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-semibold text-slate-500 flex-shrink-0">
+            <div className="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center text-xs font-semibold text-slate-400 flex-shrink-0 border border-white/[0.06]">
               {member.first_name.charAt(0)}{member.last_name.charAt(0)}
             </div>
             <div>
-              <Link href={`/socios/${p.member_id}`} className="text-sm font-medium text-slate-800 hover:text-green-600 transition-colors">
+              <Link href={`/socios/${p.member_id}`} className="text-sm font-medium text-slate-200 hover:text-[#2DC814] transition-colors">
                 {member.first_name} {member.last_name}
               </Link>
               <p className="text-xs text-slate-400">{member.member_number}</p>
@@ -173,7 +173,7 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
         )}
       </div>
 
-      <span className="text-sm text-slate-600 capitalize">{p.concept.replace('_', ' ')}</span>
+      <span className="text-sm text-slate-400 capitalize">{p.concept.replace('_', ' ')}</span>
 
       <div>
         {p.payment_method && (
@@ -183,7 +183,7 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
         )}
       </div>
 
-      <span className="text-sm font-semibold text-green-700">{formatARS(p.amount)}</span>
+      <span className="text-sm font-semibold text-[#2DC814]">{formatARS(p.amount)}</span>
 
       <div className="flex items-center gap-3">
         <span className="text-xs text-slate-400">
@@ -351,7 +351,7 @@ function ConfirmDeleteDialog({
 
 function StatCard({ label, value, color, bg }: { label: string; value: string | number; color: string; bg: string }) {
   return (
-    <div className={cn('rounded-lg p-4 border border-transparent', bg)}>
+    <div className={cn('rounded-lg p-4 border border-white/[0.06]', bg)}>
       <p className="text-xs text-slate-500 font-medium">{label}</p>
       <p className={cn('text-2xl font-bold mt-1', color)}>{value}</p>
     </div>
@@ -361,15 +361,15 @@ function StatCard({ label, value, color, bg }: { label: string; value: string | 
 function EmptyState({ hasSearch, onAdd, canCreate }: { hasSearch: boolean; onAdd: () => void; canCreate: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-        <DollarSign className="w-6 h-6 text-slate-400" />
+      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+        <DollarSign className="w-6 h-6 text-slate-500" />
       </div>
       {hasSearch ? (
         <p className="text-sm text-slate-500">Sin resultados para tu búsqueda.</p>
       ) : (
         <>
-          <p className="text-sm font-medium text-slate-700">Sin pagos registrados</p>
-          <p className="text-xs text-slate-400 mt-1 mb-4">Los pagos de socios aparecerán aquí.</p>
+          <p className="text-sm font-medium text-slate-300">Sin pagos registrados</p>
+          <p className="text-xs text-slate-500 mt-1 mb-4">Los pagos de socios aparecerán aquí.</p>
           {canCreate && (
             <Button onClick={onAdd} className="bg-green-600 hover:bg-green-700 text-white gap-2" size="sm">
               <Plus className="w-4 h-4" />

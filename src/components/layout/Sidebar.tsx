@@ -53,7 +53,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   )
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-[#0d1a0e] flex flex-col h-screen border-r border-white/5">
+    <aside className="w-64 flex-shrink-0 bg-black flex flex-col h-screen border-r border-white/5">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-white/8">
         <div className="w-9 h-9 bg-gradient-to-br from-green-400 to-green-700 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-green-900/50">
@@ -94,14 +94,14 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   isActive
-                    ? 'bg-green-900/50 text-green-100 shadow-sm ring-1 ring-green-800/50'
+                    ? 'bg-[#2DC814]/10 text-[#C8FF1C] shadow-sm ring-1 ring-[#2DC814]/30'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 )}
               >
-                <Icon className={cn('w-4 h-4 flex-shrink-0 transition-colors', isActive ? 'text-green-400' : 'text-slate-500')} />
+                <Icon className={cn('w-4 h-4 flex-shrink-0 transition-colors', isActive ? 'text-[#2DC814]' : 'text-slate-500')} />
                 {item.label}
                 {isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 bg-green-400 rounded-full shadow-sm shadow-green-400/50" />
+                  <span className="ml-auto w-1.5 h-1.5 bg-[#C8FF1C] rounded-full shadow-sm shadow-[#C8FF1C]/50" />
                 )}
               </Link>
             )
