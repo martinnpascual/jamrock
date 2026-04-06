@@ -168,67 +168,72 @@ function MemberRow({
   const fullName = `${member.first_name} ${member.last_name}`
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 lg:gap-4 px-4 py-3.5 hover:bg-white/[0.03] transition-colors items-center">
-      {/* Nombre + DNI */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-[#2DC814]/10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-[#2DC814]">
-          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+    <div className="px-4 py-3 hover:bg-white/[0.02] transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center">
+      {/* Mobile: single row layout */}
+      <div className="flex items-center justify-between gap-3 lg:contents">
+        {/* Nombre + DNI */}
+        <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex lg:items-center lg:gap-3">
+          <div className="w-9 h-9 bg-[#2DC814]/10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-[#2DC814]">
+            {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-100 truncate">{fullName}</p>
+            <p className="text-xs text-slate-400">
+              DNI {member.dni}
+              {' · '}
+              <span className="font-mono font-semibold text-slate-300">{member.member_number}</span>
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-medium text-slate-100">{fullName}</p>
-          <p className="text-xs text-slate-400">DNI {member.dni}</p>
+
+        {/* Mobile right: status + arrow */}
+        <div className="flex items-center gap-2 flex-shrink-0 lg:contents">
+          {/* Estado REPROCANN */}
+          <div className="flex items-center gap-2">
+            <StatusBadge status={member.reprocann_status as ReprocannStatus} />
+            {member.reprocann_expiry && (
+              <span className="text-xs text-slate-400 hidden xl:inline">
+                vence {new Date(member.reprocann_expiry).toLocaleDateString('es-AR')}
+              </span>
+            )}
+          </div>
+
+          {/* Tipo — hidden on mobile */}
+          <div className="hidden lg:block">
+            <Badge variant="outline" className="text-xs">
+              {MEMBER_TYPE_LABELS[member.member_type] || member.member_type}
+            </Badge>
+          </div>
+
+          {/* Acciones — desktop */}
+          <div className="hidden lg:flex items-center gap-1">
+            <Link href={`/socios/${member.id}`}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-300">
+                <Eye className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+            <Link href={`/socios/${member.id}/editar`}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-300">
+                <Pencil className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-slate-500 hover:text-red-400"
+              onClick={() => onDelete(member.id, fullName)}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+
+          {/* Mobile: arrow to detail */}
+          <Link href={`/socios/${member.id}`} className="lg:hidden">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </Link>
         </div>
-      </div>
-
-      {/* N° Socio */}
-      <div>
-        <span className="font-mono text-xs font-semibold text-slate-300 bg-white/5 border border-white/[0.06] px-2 py-0.5 rounded">
-          {member.member_number}
-        </span>
-      </div>
-
-      {/* Estado REPROCANN */}
-      <div className="flex items-center gap-2">
-        <StatusBadge status={member.reprocann_status as ReprocannStatus} />
-        {member.reprocann_expiry && (
-          <span className="text-xs text-slate-400 hidden xl:inline">
-            vence {new Date(member.reprocann_expiry).toLocaleDateString('es-AR')}
-          </span>
-        )}
-      </div>
-
-      {/* Tipo */}
-      <div>
-        <Badge variant="outline" className="text-xs">
-          {MEMBER_TYPE_LABELS[member.member_type] || member.member_type}
-        </Badge>
-      </div>
-
-      {/* Acciones */}
-      <div className="flex items-center gap-1">
-        <Link href={`/socios/${member.id}`}>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700">
-            <Eye className="w-3.5 h-3.5" />
-          </Button>
-        </Link>
-        <Link href={`/socios/${member.id}/editar`}>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700">
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-        </Link>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-slate-400 hover:text-red-500"
-          onClick={() => onDelete(member.id, fullName)}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-        <Link href={`/socios/${member.id}`}>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 lg:hidden">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </Link>
       </div>
     </div>
   )

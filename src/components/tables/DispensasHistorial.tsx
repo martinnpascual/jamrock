@@ -142,26 +142,26 @@ export function DispensasHistorial() {
         <StatCard
           label="Dispensas hoy"
           value={todayDispensations.length.toString()}
-          color="text-blue-600"
-          bg="bg-blue-50"
+          color="text-sky-400"
+          bg="bg-sky-900/30"
         />
         <StatCard
-          label="Gramos dispensados hoy"
+          label="Gramos hoy"
           value={`${todayGrams.toFixed(1)}g`}
-          color="text-green-600"
-          bg="bg-green-50"
+          color="text-[#2DC814]"
+          bg="bg-[#2DC814]/10"
         />
         <StatCard
           label="Total historial"
           value={dispensations.filter((d) => d.type === 'normal').length.toString()}
-          color="text-slate-600"
-          bg="bg-slate-50"
+          color="text-slate-300"
+          bg="bg-white/[0.04]"
         />
       </div>
 
       {/* Barra de acciones */}
-      <div className="flex gap-3 items-center">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Buscar por socio, DISP-XXXX o genética..."
@@ -170,13 +170,13 @@ export function DispensasHistorial() {
             className="pl-9 h-10"
           />
         </div>
-        <Link href="/dispensas/nueva">
-          <Button className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10">
+        <Link href="/dispensas/nueva" className="flex-shrink-0">
+          <Button className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold gap-2 h-10 w-full sm:w-auto">
             <Plus className="w-4 h-4" />
             Nueva dispensa
           </Button>
         </Link>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-auto">
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
           <Lock className="w-3.5 h-3.5" />
           <span>Registro inmutable</span>
         </div>
@@ -186,9 +186,9 @@ export function DispensasHistorial() {
       {filtered.length === 0 ? (
         <EmptyState hasSearch={!!search} />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
           <div className={cn(
-            'hidden gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 uppercase tracking-wide',
+            'hidden gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide',
             isGerente
               ? 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto_auto]'
               : 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto]'
@@ -201,7 +201,7 @@ export function DispensasHistorial() {
             <span>Tipo</span>
             {isGerente && <span />}
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-white/[0.04]">
             {filtered.map((d) => (
               <DispensationRow
                 key={d.id}
@@ -224,7 +224,7 @@ export function DispensasHistorial() {
             </DialogTitle>
             <DialogDescription>
               Esta acción creará un registro de anulación para{' '}
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-slate-200">
                 {voidTarget?.dispensation_number}
               </span>
               . El registro original permanece inmutable (REPROCANN).
@@ -232,8 +232,8 @@ export function DispensasHistorial() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <label className="text-sm font-medium text-slate-700">
-              Motivo de anulación <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-slate-200">
+              Motivo de anulación <span className="text-red-400">*</span>
             </label>
             <Textarea
               placeholder="Describí el motivo de la anulación (mínimo 10 caracteres)..."
@@ -281,83 +281,111 @@ function DispensationRow({
 
   return (
     <div className={cn(
-      'grid grid-cols-1 gap-2 px-4 py-3 items-center',
+      'px-4 py-3 transition-colors',
       isGerente
-        ? 'lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto_auto] lg:gap-4'
-        : 'lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto] lg:gap-4',
-      isAnulacion ? 'bg-red-50 opacity-70' : 'hover:bg-slate-50'
+        ? 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto_auto] lg:gap-4 lg:items-center'
+        : 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center',
+      isAnulacion ? 'bg-red-950/20 opacity-80' : 'hover:bg-white/[0.02]'
     )}>
-      {/* N° */}
-      <span className="font-mono text-xs font-semibold text-slate-600">
-        {d.dispensation_number}
-      </span>
+      {/* Mobile layout — row with all info */}
+      <div className="flex items-start justify-between gap-3 lg:contents">
+        {/* Left: avatar + info */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 lg:contents">
+          {/* N° — hidden on mobile, shown in desktop grid */}
+          <span className="hidden lg:block font-mono text-xs font-semibold text-slate-400">
+            {d.dispensation_number}
+          </span>
 
-      {/* Socio */}
-      <div className="flex items-center gap-2.5">
-        {d.members ? (
-          <>
-            <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-semibold text-slate-500 flex-shrink-0">
-              {d.members.first_name.charAt(0)}{d.members.last_name.charAt(0)}
+          {/* Socio */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {d.members ? (
+              <>
+                <div className="w-8 h-8 bg-[#2DC814]/10 rounded-full flex items-center justify-center text-xs font-semibold text-[#2DC814] flex-shrink-0">
+                  {d.members.first_name.charAt(0)}{d.members.last_name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <Link
+                    href={`/socios/${d.members.id}`}
+                    className="text-sm font-medium text-slate-200 hover:text-[#2DC814] transition-colors truncate block"
+                  >
+                    {d.members.first_name} {d.members.last_name}
+                  </Link>
+                  {/* Mobile: show N° and member_number inline */}
+                  <p className="text-xs text-slate-500 lg:hidden">
+                    <span className="font-mono font-semibold text-slate-400">{d.dispensation_number}</span>
+                    {' · '}
+                    {d.members.member_number}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <span className="text-sm text-slate-500 italic">—</span>
+            )}
+          </div>
+        </div>
+
+        {/* Right side on mobile: grams + badge + action */}
+        <div className="flex items-center gap-2 flex-shrink-0 lg:contents">
+          {/* Genética — hidden on mobile */}
+          <span className="hidden lg:block text-sm text-slate-300">{d.genetics}</span>
+
+          {/* Gramos */}
+          <span className={cn(
+            'text-sm font-bold tabular-nums',
+            isAnulacion ? 'text-red-400' : 'text-slate-100'
+          )}>
+            {isAnulacion ? '-' : ''}{d.quantity_grams}g
+          </span>
+
+          {/* Fecha — hidden on mobile */}
+          <span className="hidden lg:block text-xs text-slate-500">
+            {new Date(d.created_at).toLocaleDateString('es-AR', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+
+          {/* Tipo badge */}
+          {isAnulacion ? (
+            <Badge variant="destructive" className="text-xs shrink-0">Anulación</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs shrink-0 text-[#2DC814] border-[#2DC814]/30">Normal</Badge>
+          )}
+
+          {/* Acción anular — solo gerente, solo dispensas normales */}
+          {isGerente && (
+            <div className="flex justify-end">
+              {!isAnulacion && (
+                <button
+                  type="button"
+                  title="Anular dispensa"
+                  onClick={() => onVoid(d)}
+                  className="p-1.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <div>
-              <Link
-                href={`/socios/${d.members.id}`}
-                className="text-sm font-medium text-slate-800 hover:text-green-600 transition-colors"
-              >
-                {d.members.first_name} {d.members.last_name}
-              </Link>
-              <p className="text-xs text-slate-400">{d.members.member_number}</p>
-            </div>
-          </>
-        ) : (
-          <span className="text-sm text-slate-400 italic">—</span>
-        )}
-      </div>
-
-      {/* Genética */}
-      <span className="text-sm text-slate-700">{d.genetics}</span>
-
-      {/* Gramos */}
-      <span className={cn(
-        'text-sm font-semibold',
-        isAnulacion ? 'text-red-500' : 'text-slate-800'
-      )}>
-        {isAnulacion ? '-' : ''}{d.quantity_grams}g
-      </span>
-
-      {/* Fecha */}
-      <span className="text-xs text-slate-400">
-        {new Date(d.created_at).toLocaleDateString('es-AR', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </span>
-
-      {/* Tipo */}
-      {isAnulacion ? (
-        <Badge variant="destructive" className="text-xs">Anulación</Badge>
-      ) : (
-        <Badge variant="outline" className="text-xs text-green-700 border-green-200">Normal</Badge>
-      )}
-
-      {/* Acción anular — solo gerente, solo dispensas normales */}
-      {isGerente && (
-        <div className="flex justify-end">
-          {!isAnulacion && (
-            <button
-              type="button"
-              title="Anular dispensa"
-              onClick={() => onVoid(d)}
-              className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Mobile: genetics + date — second line */}
+      <div className="flex items-center gap-2 mt-1 lg:hidden pl-10">
+        <span className="text-xs text-slate-400">{d.genetics}</span>
+        <span className="text-slate-600">·</span>
+        <span className="text-xs text-slate-500">
+          {new Date(d.created_at).toLocaleDateString('es-AR', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      </div>
     </div>
   )
 }
@@ -374,7 +402,7 @@ function StatCard({
   bg: string
 }) {
   return (
-    <div className={`${bg} rounded-lg p-4 border border-transparent`}>
+    <div className={`${bg} rounded-lg p-4 border border-white/[0.05]`}>
       <p className="text-xs text-slate-500 font-medium">{label}</p>
       <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
     </div>
@@ -384,17 +412,17 @@ function StatCard({
 function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-        <Syringe className="w-6 h-6 text-slate-400" />
+      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+        <Syringe className="w-6 h-6 text-slate-500" />
       </div>
       {hasSearch ? (
-        <p className="text-sm text-slate-500">Sin resultados para tu búsqueda.</p>
+        <p className="text-sm text-slate-400">Sin resultados para tu búsqueda.</p>
       ) : (
         <>
-          <p className="text-sm font-medium text-slate-700">Sin dispensas registradas</p>
-          <p className="text-xs text-slate-400 mt-1 mb-4">Las dispensas aparecerán aquí una vez registradas.</p>
+          <p className="text-sm font-medium text-slate-300">Sin dispensas registradas</p>
+          <p className="text-xs text-slate-500 mt-1 mb-4">Las dispensas aparecerán aquí una vez registradas.</p>
           <Link href="/dispensas/nueva">
-            <Button className="bg-green-600 hover:bg-green-700 text-white gap-2" size="sm">
+            <Button className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold gap-2" size="sm">
               <Plus className="w-4 h-4" />
               Primera dispensa
             </Button>
