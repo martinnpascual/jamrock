@@ -70,7 +70,11 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const pid = watch('product_id')
   const selProd = products.find(p => p.id === pid)
   async function onSubmit(data: SaleFormData) {
-    try { await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price || 0 }); reset(); setOpen(false) } catch { /**/ }
+    try {
+      await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price || 0 })
+      reset()
+      setOpen(false)
+    } catch { /* error shown via createSale.error */ }
   }
   if (isLoading) return <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
   return (
@@ -171,7 +175,11 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
     resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
   })
   async function onSubmit(data: ProductFormData) {
-    try { await createProduct.mutateAsync(data); reset(); setOpen(false) } catch { /**/ }
+    try {
+      await createProduct.mutateAsync(data)
+      reset()
+      setOpen(false)
+    } catch { /* error shown via createProduct.error */ }
   }
   if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
   return (
@@ -239,8 +247,13 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
   const openReg = useOpenCashRegister()
   const closeReg = useCloseCashRegister()
   const [showClose, setShowClose] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<CashRegisterCloseData>({ resolver: zodResolver(cashRegisterCloseSchema) })
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CashRegisterCloseData>({
+    resolver: zodResolver(cashRegisterCloseSchema),
+    defaultValues: { actual_total: 0 },
+  })
 
   function showToast(msg: string) {
     setToast(msg)
@@ -251,17 +264,29 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
     try {
       await openReg.mutateAsync()
       showToast('Caja abierta')
-    } catch { /**/ }
+    } catch (err) {
+      // error shown via openReg.error
+      console.error('Error al abrir caja:', err)
+    }
   }
 
   async function onClose(d: CashRegisterCloseData) {
-    if (!data?.register?.id) return
+    if (!data?.register?.id) {
+      setCloseError('No se encontró la caja del día')
+      return
+    }
+    setClosing(true)
+    setCloseError('')
     try {
       await closeReg.mutateAsync({ id: data.register.id, actual_total: d.actual_total, notes: d.notes })
       reset()
       setShowClose(false)
-      showToast('Caja cerrada')
-    } catch { /**/ }
+      showToast('Caja cerrada correctamente')
+    } catch (err) {
+      setCloseError(err instanceof Error ? err.message : 'Error al cerrar la caja. Intentá de nuevo.')
+    } finally {
+      setClosing(false)
+    }
   }
   if (isLoading) return <Skeleton className="h-48 w-full" />
   const reg = data?.register ?? null
@@ -315,18 +340,43 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
           </div>
         )}
       </div>
-      <Dialog open={showClose} onOpenChange={o => { if (!o) { reset(); setShowClose(false) } }}>
+      <Dialog open={showClose} onOpenChange={o => { if (!o && !closing) { reset(); setCloseError(''); setShowClose(false) } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>Cerrar caja del día</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onClose)} className="space-y-4">
-            <div className="bg-white/5 border border-white/[0.06] rounded-lg p-3"><p className="text-xs text-slate-500">Total esperado</p><p className="text-xl font-bold text-slate-100">{ARS(stats.expected_total)}</p></div>
-            <div className="space-y-1.5"><Label>Monto contado en caja ($) *</Label><Input type="number" step="0.01" placeholder="0.00" autoFocus {...register('actual_total')} /></div>
-            <div className="space-y-1.5"><Label>Notas</Label><Textarea placeholder="Observaciones del cierre..." rows={2} {...register('notes')} /></div>
-            {closeReg.error && <p className="text-sm text-red-500">{(closeReg.error as Error).message}</p>}
+            <div className="bg-white/5 border border-white/[0.06] rounded-lg p-3">
+              <p className="text-xs text-slate-500">Total esperado en caja</p>
+              <p className="text-2xl font-bold text-slate-100">{ARS(stats.expected_total)}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Monto contado en caja ($) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                autoFocus
+                {...register('actual_total', { valueAsNumber: true })}
+                className={errors.actual_total ? 'border-red-500' : ''}
+              />
+              {errors.actual_total && <p className="text-xs text-red-400">{errors.actual_total.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas <span className="text-slate-500 font-normal">(opcional)</span></Label>
+              <Textarea placeholder="Observaciones del cierre..." rows={2} {...register('notes')} />
+            </div>
+            {closeError && (
+              <div className="flex items-center gap-2 bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">{closeError}</p>
+              </div>
+            )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { reset(); setShowClose(false) }}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting || closeReg.isPending} className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold">
-                {isSubmitting || closeReg.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cerrando...</> : 'Cerrar caja'}
+              <Button type="button" variant="outline" onClick={() => { reset(); setCloseError(''); setShowClose(false) }} disabled={closing}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={closing} className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold">
+                {closing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cerrando...</> : 'Cerrar caja'}
               </Button>
             </DialogFooter>
           </form>
