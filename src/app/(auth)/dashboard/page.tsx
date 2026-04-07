@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock, ArrowDownUp } from 'lucide-react'
+import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock, ArrowDownUp, ShoppingCart, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +26,8 @@ export default async function DashboardPage() {
     solicitudesRes,
     dispensasRecentesRes,
     cuentasEnDeudaRes,
+    ventasHoyRes,
+    fiadoHoyRes,
   ] = await Promise.all([
     supabase
       .from('members')
@@ -66,10 +68,24 @@ export default async function DashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('is_deleted', false)
       .lt('balance', 0),
+    supabase
+      .from('checkout_transactions')
+      .select('total_amount')
+      .gte('created_at', `${today}T00:00:00`)
+      .eq('payment_status', 'pagado'),
+    supabase
+      .from('checkout_transactions')
+      .select('total_amount')
+      .gte('created_at', `${today}T00:00:00`)
+      .eq('payment_status', 'fiado'),
   ])
 
   const isGerente = profile?.role === 'gerente'
   const firstName = profile?.full_name?.split(' ')[0] ?? null
+
+  const ventasHoyTotal = (ventasHoyRes.data ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
+  const fiadoHoyTotal  = (fiadoHoyRes.data  ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
+  const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
   type Alert = { msg: string; href: string; color: string }
   const alerts: Alert[] = []
@@ -156,6 +172,26 @@ export default async function DashboardPage() {
             bg="bg-violet-900/30"
             href="/cuentas-corrientes?balance_status=negative"
             badge={(cuentasEnDeudaRes.count ?? 0) > 0}
+          />
+        )}
+        {isGerente && (
+          <KPIAmountCard
+            title="Ventas del día"
+            amount={ventasHoyTotal}
+            icon={ShoppingCart}
+            color="text-emerald-400"
+            bg="bg-emerald-900/30"
+            href="/dispensas"
+          />
+        )}
+        {isGerente && fiadoHoyTotal > 0 && (
+          <KPIAmountCard
+            title="Fiado del día"
+            amount={fiadoHoyTotal}
+            icon={Banknote}
+            color="text-amber-400"
+            bg="bg-amber-900/30"
+            href="/dispensas"
           />
         )}
       </div>
@@ -273,6 +309,41 @@ function KPICard({
               {badge && value > 0 && (
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#151515]" />
               )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+function KPIAmountCard({
+  title,
+  amount,
+  icon: Icon,
+  color,
+  bg,
+  href,
+}: {
+  title: string
+  amount: number
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+  bg: string
+  href: string
+}) {
+  const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+  return (
+    <Link href={href}>
+      <Card className="shadow-sm border-white/[0.06] bg-card hover:bg-[#1c1c1c] transition-colors cursor-pointer h-full">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide leading-tight">{title}</p>
+              <p className="text-xl font-bold text-foreground mt-1 leading-tight">{ARS(amount)}</p>
+            </div>
+            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', bg)}>
+              <Icon className={cn('w-5 h-5', color)} />
             </div>
           </div>
         </CardContent>

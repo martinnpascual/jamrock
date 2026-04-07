@@ -1,0 +1,430 @@
+/**
+ * POST /api/checkout
+ *
+ * Flujo atómico de checkout: dispensa + productos + pago.
+ * Usa createAdminClient() (service_role) para bypassear RLS en todos los inserts.
+ *
+ * DISEÑO DE CC:
+ *   Las sales se crean SIN member_id para evitar que sale_to_cc_movement
+ *   genere DÉBITO duplicado. La asociación socio↔venta vive en checkout_items.
+ *   CC se maneja exclusivamente aquí:
+ *     PAGO:  DÉBITO manual (total) + CRÉDITO via payment trigger → neto 0
+ *     FIADO: DÉBITO manual (total) → queda como deuda
+ *     GRATIS (total=0): sin movimiento CC
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { checkoutRequestSchema } from '@/lib/validations/checkout'
+
+export async function POST(request: NextRequest) {
+  // ── Autenticación ─────────────────────────────────────────────────────────
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos para registrar checkout' }, { status: 403 })
+  }
+
+  // ── Parsear body ──────────────────────────────────────────────────────────
+  let body: unknown
+  try { body = await request.json() }
+  catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }) }
+
+  const parsed = checkoutRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Datos inválidos', details: parsed.error.flatten() },
+      { status: 422 }
+    )
+  }
+
+  const { member_id, dispensation: dispInput, items = [], payment } = parsed.data
+  const admin = createAdminClient()
+
+  // ── PASO 1: VALIDACIONES ──────────────────────────────────────────────────
+
+  // 1a. Socio existe y no está eliminado
+  const { data: member, error: memberErr } = await admin
+    .from('members')
+    .select('id, first_name, last_name, member_number, reprocann_status')
+    .eq('id', member_id)
+    .eq('is_deleted', false)
+    .single()
+
+  if (memberErr || !member) {
+    return NextResponse.json({ error: 'Socio no encontrado' }, { status: 404 })
+  }
+
+  // 1b. REPROCANN activo
+  if (member.reprocann_status !== 'activo') {
+    return NextResponse.json(
+      { error: `Dispensa bloqueada: REPROCANN ${member.reprocann_status}` },
+      { status: 422 }
+    )
+  }
+
+  // 1c. Lote medicinal existe, no eliminado, stock suficiente
+  const { data: lot, error: lotErr } = await admin
+    .from('medical_stock_lots')
+    .select('id, genetics, current_grams')
+    .eq('id', dispInput.lot_id)
+    .eq('is_deleted', false)
+    .single()
+
+  if (lotErr || !lot) {
+    return NextResponse.json({ error: 'Lote medicinal no encontrado' }, { status: 404 })
+  }
+  if (lot.current_grams < dispInput.quantity_grams) {
+    return NextResponse.json(
+      { error: `Stock medicinal insuficiente. Disponible: ${lot.current_grams}g` },
+      { status: 422 }
+    )
+  }
+
+  // 1d. Validar productos del carrito
+  type ProductRow = { id: string; name: string; price: number; stock_quantity: number }
+  const productsMap: Record<string, ProductRow> = {}
+
+  for (const item of items) {
+    const { data: product, error: prodErr } = await admin
+      .from('commercial_products')
+      .select('id, name, price, stock_quantity')
+      .eq('id', item.product_id)
+      .eq('is_deleted', false)
+      .single()
+
+    if (prodErr || !product) {
+      return NextResponse.json({ error: `Producto no encontrado: ${item.product_id}` }, { status: 404 })
+    }
+    if (product.stock_quantity < item.quantity) {
+      return NextResponse.json(
+        { error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock_quantity}` },
+        { status: 422 }
+      )
+    }
+    productsMap[item.product_id] = product
+  }
+
+  // 1e. Leer config de precio por gramo
+  const { data: configRow } = await admin
+    .from('app_config')
+    .select('value')
+    .eq('key', 'dispensation_price_per_gram')
+    .single()
+
+  const dispConfig = (configRow?.value as { enabled: boolean; price: number }) ?? { enabled: false, price: 0 }
+  const pricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
+
+  // 1f. Calcular totales
+  const dispensationAmount = pricePerGram * dispInput.quantity_grams
+  const productsAmount = items.reduce((sum, item) => {
+    return sum + (productsMap[item.product_id].price * item.quantity)
+  }, 0)
+  const totalAmount = dispensationAmount + productsAmount
+
+  // 1g+h. Validar montos de pago
+  const amountCash     = Number(payment.method !== 'cuenta_corriente' ? (payment.amount_cash ?? 0) : 0)
+  const amountTransfer = Number(payment.method !== 'cuenta_corriente' ? (payment.amount_transfer ?? 0) : 0)
+
+  if (payment.method !== 'cuenta_corriente' && totalAmount > 0) {
+    if (amountCash + amountTransfer < totalAmount) {
+      return NextResponse.json(
+        { error: `Monto insuficiente. Total: $${totalAmount}, Recibido: $${amountCash + amountTransfer}` },
+        { status: 422 }
+      )
+    }
+  }
+
+  if (payment.method === 'cuenta_corriente') {
+    // Verificar credit_limit si está configurado
+    const { data: ccAccount } = await admin
+      .from('current_accounts')
+      .select('balance, credit_limit')
+      .eq('member_id', member_id)
+      .eq('is_deleted', false)
+      .single()
+
+    if (ccAccount && ccAccount.credit_limit > 0) {
+      const newBalance = ccAccount.balance - totalAmount
+      if (newBalance < -ccAccount.credit_limit) {
+        return NextResponse.json(
+          { error: `La deuda excede el límite de crédito ($${ccAccount.credit_limit})` },
+          { status: 422 }
+        )
+      }
+    }
+  }
+
+  // ── PASO 2: CREAR DISPENSA ────────────────────────────────────────────────
+  const { data: dispensation, error: dispErr } = await admin
+    .from('dispensations')
+    .insert({
+      member_id,
+      lot_id:         dispInput.lot_id,
+      genetics:       dispInput.genetics,
+      quantity_grams: dispInput.quantity_grams,
+      notes:          dispInput.notes ?? null,
+      type:           'normal',
+      created_by:     user.id,
+    })
+    .select('id, dispensation_number')
+    .single()
+
+  if (dispErr || !dispensation) {
+    console.error('checkout: error creating dispensation:', dispErr?.code)
+    return NextResponse.json({ error: 'Error al registrar dispensa' }, { status: 500 })
+  }
+
+  // A partir de aquí, si algo falla intentamos anular la dispensa como rollback
+  const rollbackDispensation = async () => {
+    await admin.from('dispensations').insert({
+      member_id,
+      lot_id:         dispInput.lot_id,
+      genetics:       dispInput.genetics,
+      quantity_grams: dispInput.quantity_grams,
+      notes:          'Anulación automática por error en checkout',
+      type:           'anulacion',
+      nullifies_id:   dispensation.id,
+      created_by:     user.id,
+    })
+  }
+
+  // ── PASO 3: CREAR VENTAS (sin member_id para evitar doble CC) ─────────────
+  const saleIds: Record<string, string> = {} // product_id → sale_id
+
+  for (const item of items) {
+    const product = productsMap[item.product_id]
+    const { data: sale, error: saleErr } = await admin
+      .from('sales')
+      .insert({
+        product_id:     item.product_id,
+        member_id:      null,                 // ← intencional: CC manejado por checkout
+        quantity:       item.quantity,
+        unit_price:     product.price,
+        total:          product.price * item.quantity,
+        payment_method: payment.method === 'cuenta_corriente' ? null : payment.method,
+        created_by:     user.id,
+      })
+      .select('id')
+      .single()
+
+    if (saleErr || !sale) {
+      console.error('checkout: error creating sale:', saleErr?.code)
+      await rollbackDispensation()
+      return NextResponse.json({ error: 'Error al registrar venta de producto' }, { status: 500 })
+    }
+    saleIds[item.product_id] = sale.id
+  }
+
+  // ── PASO 4: CC y PAGO ─────────────────────────────────────────────────────
+  let paymentId: string | null = null
+  let ccMovementId: string | null = null
+  let changeGiven = 0
+  let ccBalanceAfter = 0
+
+  if (totalAmount > 0) {
+    // Obtener o crear CC del socio
+    const { data: existingCC } = await admin
+      .from('current_accounts')
+      .select('id, balance')
+      .eq('member_id', member_id)
+      .eq('is_deleted', false)
+      .single()
+
+    let accountId: string
+
+    if (existingCC) {
+      accountId = existingCC.id
+    } else {
+      const { data: newCC, error: ccCreateErr } = await admin
+        .from('current_accounts')
+        .insert({ entity_type: 'socio', member_id, created_by: user.id })
+        .select('id, balance')
+        .single()
+      if (ccCreateErr || !newCC) {
+        await rollbackDispensation()
+        return NextResponse.json({ error: 'Error al obtener cuenta corriente' }, { status: 500 })
+      }
+      accountId = newCC.id
+    }
+
+    // 4a. DÉBITO manual por el checkout (total completo)
+    const itemsDescription = items.length > 0
+      ? ` + Productos: ${items.map(i => `${productsMap[i.product_id].name} ×${i.quantity}`).join(', ')}`
+      : ''
+    const debitDescription = `Checkout: ${dispensation.dispensation_number} — ${dispInput.genetics} ×${dispInput.quantity_grams}g${itemsDescription}`
+
+    const { data: debitMovement, error: debitErr } = await admin
+      .from('current_account_movements')
+      .insert({
+        account_id:    accountId,
+        movement_type: 'debito',
+        amount:        totalAmount,
+        balance_after: 0,            // calculado por trigger calc_balance_before_movement
+        concept:       payment.method === 'cuenta_corriente' ? 'checkout_fiado' : 'checkout_deuda',
+        description:   debitDescription,
+        source_type:   'manual',
+        source_id:     null,
+        created_by:    user.id,
+      })
+      .select('id, balance_after')
+      .single()
+
+    if (debitErr || !debitMovement) {
+      console.error('checkout: error creating debit movement:', debitErr?.message)
+      await rollbackDispensation()
+      return NextResponse.json({ error: 'Error al registrar movimiento en cuenta corriente' }, { status: 500 })
+    }
+    ccMovementId   = debitMovement.id
+    ccBalanceAfter = debitMovement.balance_after
+
+    // 4b. PAGO (solo si no es fiado)
+    if (payment.method !== 'cuenta_corriente') {
+      changeGiven = Math.max(0, amountCash + amountTransfer - totalAmount)
+
+      const paymentNotes = `Checkout ${dispensation.dispensation_number}` +
+        (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
+        (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(2)}` : '')
+
+      const { data: newPayment, error: paymentErr } = await admin
+        .from('payments')
+        .insert({
+          member_id,
+          amount:         totalAmount,
+          concept:        'checkout',
+          payment_method: payment.method,
+          notes:          paymentNotes,
+          created_by:     user.id,
+        })
+        .select('id')
+        .single()
+
+      if (paymentErr || !newPayment) {
+        console.error('checkout: error creating payment:', paymentErr?.code)
+        await rollbackDispensation()
+        return NextResponse.json({ error: 'Error al registrar pago' }, { status: 500 })
+      }
+      paymentId = newPayment.id
+
+      // 4c. Sumar efectivo a caja del día
+      if (amountCash > 0) {
+        const today = new Date().toISOString().split('T')[0]
+
+        // Buscar o crear caja del día
+        const { data: existingReg } = await admin
+          .from('cash_registers')
+          .select('id, expected_total')
+          .eq('register_date', today)
+          .single()
+
+        if (existingReg) {
+          await admin
+            .from('cash_registers')
+            .update({ expected_total: Number(existingReg.expected_total) + amountCash })
+            .eq('id', existingReg.id)
+        } else {
+          await admin
+            .from('cash_registers')
+            .insert({
+              register_date:  today,
+              expected_total: amountCash,
+              status:         'abierta',
+              created_by:     user.id,
+            })
+        }
+      }
+
+      // Actualizar balance after del débito (ahora que el payment trigger ya corrió)
+      const { data: updatedCC } = await admin
+        .from('current_accounts')
+        .select('balance')
+        .eq('id', accountId)
+        .single()
+      if (updatedCC) ccBalanceAfter = updatedCC.balance
+    }
+  }
+
+  // ── PASO 5: CREAR checkout_transaction ────────────────────────────────────
+  const isFiado  = payment.method === 'cuenta_corriente'
+  const isFree   = totalAmount === 0
+
+  const { data: transaction, error: txnErr } = await admin
+    .from('checkout_transactions')
+    .insert({
+      member_id,
+      dispensation_id:      dispensation.id,
+      dispensation_amount:  dispensationAmount,
+      products_amount:      productsAmount,
+      total_amount:         totalAmount,
+      payment_status:       isFree ? 'pagado' : isFiado ? 'fiado' : 'pagado',
+      payment_method:       isFree || isFiado ? null : payment.method,
+      amount_paid:          isFree || isFiado ? 0 : totalAmount,
+      amount_cash:          amountCash,
+      amount_transfer:      amountTransfer,
+      amount_charged_to_cc: isFiado ? totalAmount : 0,
+      change_given:         changeGiven,
+      payment_id:           paymentId,
+      cc_movement_id:       ccMovementId,
+      notes:                dispInput.notes ?? null,
+      created_by:           user.id,
+    })
+    .select('id, transaction_number')
+    .single()
+
+  if (txnErr || !transaction) {
+    console.error('checkout: error creating transaction:', txnErr?.code)
+    await rollbackDispensation()
+    return NextResponse.json({ error: 'Error al registrar transacción' }, { status: 500 })
+  }
+
+  // ── PASO 6: CREAR checkout_items ──────────────────────────────────────────
+  if (items.length > 0) {
+    const itemsToInsert = items.map(item => {
+      const product = productsMap[item.product_id]
+      return {
+        transaction_id: transaction.id,
+        product_id:     item.product_id,
+        product_name:   product.name,
+        quantity:       item.quantity,
+        unit_price:     product.price,
+        subtotal:       product.price * item.quantity,
+        sale_id:        saleIds[item.product_id] ?? null,
+      }
+    })
+
+    const { error: itemsErr } = await admin
+      .from('checkout_items')
+      .insert(itemsToInsert)
+
+    if (itemsErr) {
+      console.error('checkout: error creating checkout_items:', itemsErr.code)
+      // No revertimos aquí — la dispensa y transacción ya están registradas
+      // Los items son el menor problema (no afectan stock ni CC)
+    }
+  }
+
+  // ── PASO 7: RESPUESTA ─────────────────────────────────────────────────────
+  return NextResponse.json({
+    success: true,
+    transaction: {
+      transaction_number:    transaction.transaction_number,
+      dispensation_number:   dispensation.dispensation_number,
+      total_amount:          totalAmount,
+      dispensation_amount:   dispensationAmount,
+      products_amount:       productsAmount,
+      payment_status:        isFree ? 'pagado' : isFiado ? 'fiado' : 'pagado',
+      amount_paid:           isFree || isFiado ? 0 : totalAmount,
+      amount_charged_to_cc:  isFiado ? totalAmount : 0,
+      change_given:          changeGiven,
+      cc_balance:            ccBalanceAfter,
+    },
+  }, { status: 201 })
+}

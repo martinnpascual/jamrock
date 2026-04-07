@@ -1,4 +1,4 @@
-import { DispensationFlow } from '@/components/forms/DispensationFlow'
+import { CheckoutWizard } from '../components/CheckoutWizard'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Lock } from 'lucide-react'
@@ -23,7 +23,7 @@ export default function NuevaDispensaPage() {
         </div>
       </div>
 
-      <DispensationFlow />
+      <CheckoutWizard />
     </div>
   )
 }

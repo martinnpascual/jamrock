@@ -18,9 +18,14 @@ import {
   Mail,
   MapPin,
   FileText,
+  ShoppingCart,
 } from 'lucide-react'
 import { MEMBER_TYPE_LABELS, REPROCANN_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/constants'
+import { cn } from '@/lib/utils'
 import type { Member, ReprocannStatus, Dispensation, Payment } from '@/types/database'
+
+const ARS = (n: number) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 export default async function MemberDetailPage({
   params,
@@ -29,7 +34,7 @@ export default async function MemberDetailPage({
 }) {
   const supabase = createClient()
 
-  const [memberRes, dispensasRes, pagosRes] = await Promise.all([
+  const [memberRes, dispensasRes, pagosRes, transaccionesRes] = await Promise.all([
     supabase
       .from('members')
       .select('*')
@@ -49,6 +54,12 @@ export default async function MemberDetailPage({
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .limit(10),
+    supabase
+      .from('checkout_transactions')
+      .select('transaction_number, total_amount, payment_status, created_at')
+      .eq('member_id', params.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
   ])
 
   if (memberRes.error || !memberRes.data) notFound()
@@ -56,6 +67,7 @@ export default async function MemberDetailPage({
   const member = memberRes.data as Member
   const dispensas = (dispensasRes.data ?? []) as Dispensation[]
   const pagos = (pagosRes.data ?? []) as Payment[]
+  const transacciones = transaccionesRes.data ?? []
   const fullName = `${member.first_name} ${member.last_name}`
 
   const isReprocannExpired =
@@ -280,6 +292,49 @@ export default async function MemberDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {/* Transacciones checkout */}
+          {transacciones.length > 0 && (
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4" />
+                  Transacciones recientes
+                  <span className="ml-auto text-xs font-normal text-slate-400">
+                    {transacciones.length} registros
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {transacciones.map((t: any) => (
+                    <div key={t.transaction_number} className="flex items-center justify-between px-4 py-2.5">
+                      <div>
+                        <p className="text-xs font-medium text-slate-700 font-mono">{t.transaction_number}</p>
+                        <span className={cn(
+                          'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                          t.payment_status === 'pagado'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-amber-100 text-amber-700'
+                        )}>
+                          {t.payment_status === 'pagado' ? 'Pagado' : 'Fiado'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-slate-700">{ARS(t.total_amount)}</p>
+                        <p className="text-xs text-slate-400">
+                          {new Date(t.created_at).toLocaleDateString('es-AR', {
+                            day: '2-digit', month: 'short',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Meta */}
           <div className="flex items-center gap-4 text-xs text-slate-400">

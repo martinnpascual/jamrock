@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRole } from '@/hooks/useRole'
 import { useAppConfig, useSaveAppConfig } from '@/hooks/useAppConfig'
+import { useDispensationConfig } from '@/hooks/useDispensationConfig'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2, ShoppingCart, ToggleLeft, ToggleRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types/database'
 
@@ -198,9 +199,148 @@ export default function ConfiguracionPage() {
         </CardContent>
       </Card>
 
-      {/* ── Sección 3: Operadores (solo gerente) ── */}
+      {/* ── Sección 3: Dispensas y Checkout ── */}
+      <CheckoutConfigSection isGerente={isGerente} />
+
+      {/* ── Sección 4: Operadores (solo gerente) ── */}
       {isGerente && <OperatorsSection />}
     </div>
+  )
+}
+
+// ─── Checkout Config ──────────────────────────────────────────────────────────
+function CheckoutConfigSection({ isGerente }: { isGerente: boolean }) {
+  const qc = useQueryClient()
+  const { data: config, isLoading } = useDispensationConfig()
+
+  const [enabled,       setEnabled]       = useState(false)
+  const [pricePerGram,  setPricePerGram]  = useState('')
+  const [allowCredit,   setAllowCredit]   = useState(true)
+  const [showCCBalance, setShowCCBalance] = useState(true)
+  const [saved,         setSaved]         = useState(false)
+  const [error,         setError]         = useState('')
+
+  useEffect(() => {
+    if (config) {
+      setEnabled(config.enabled)
+      setPricePerGram(config.pricePerGram > 0 ? String(config.pricePerGram) : '')
+      setAllowCredit(config.allowCredit)
+      setShowCCBalance(config.showCCBalance)
+    }
+  }, [config])
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/checkout/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dispensation_price_per_gram: { enabled, price: parseFloat(pricePerGram) || 0 },
+          checkout_allow_credit:       { enabled: allowCredit },
+          checkout_show_cc_balance:    { enabled: showCCBalance },
+        }),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error ?? 'Error') }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['checkout-config'] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Error'),
+  })
+
+  function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+    return (
+      <button
+        type="button"
+        onClick={() => !disabled && onChange(!value)}
+        disabled={disabled}
+        className={cn('flex-shrink-0 transition-colors', disabled && 'opacity-50 cursor-not-allowed')}
+      >
+        {value
+          ? <ToggleRight className="w-7 h-7 text-[#2DC814]" />
+          : <ToggleLeft  className="w-7 h-7 text-slate-500" />}
+      </button>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ShoppingCart className="w-4 h-4 text-slate-500" />
+          Dispensas y Checkout
+          {!isGerente && <Lock className="w-4 h-4 text-slate-400" />}
+        </CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">Configuración del flujo de dispensa y cobro</p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : (
+          <div className="space-y-4">
+            {/* Cobrar dispensa */}
+            <div className="flex items-center justify-between gap-4 py-2 border-b border-white/[0.05]">
+              <div>
+                <p className="text-sm font-medium text-slate-200">Cobrar dispensa</p>
+                <p className="text-xs text-slate-500">Habilitar precio por gramo al dispensar</p>
+              </div>
+              <Toggle value={enabled} onChange={setEnabled} disabled={!isGerente} />
+            </div>
+            {enabled && (
+              <div className="space-y-1.5 pl-1">
+                <Label className="text-slate-300 text-xs">Precio por gramo ($)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={10}
+                  placeholder="ej: 500"
+                  value={pricePerGram}
+                  onChange={e => setPricePerGram(e.target.value)}
+                  disabled={!isGerente}
+                  className="h-9 max-w-[180px]"
+                />
+              </div>
+            )}
+
+            {/* Permitir fiado */}
+            <div className="flex items-center justify-between gap-4 py-2 border-b border-white/[0.05]">
+              <div>
+                <p className="text-sm font-medium text-slate-200">Permitir cuenta corriente</p>
+                <p className="text-xs text-slate-500">Habilitar pago en fiado al momento del checkout</p>
+              </div>
+              <Toggle value={allowCredit} onChange={setAllowCredit} disabled={!isGerente} />
+            </div>
+
+            {/* Mostrar saldo CC */}
+            <div className="flex items-center justify-between gap-4 py-2">
+              <div>
+                <p className="text-sm font-medium text-slate-200">Mostrar saldo de cuenta corriente</p>
+                <p className="text-xs text-slate-500">Visible en el paso de pago del checkout</p>
+              </div>
+              <Toggle value={showCCBalance} onChange={setShowCCBalance} disabled={!isGerente} />
+            </div>
+
+            {/* Guardar */}
+            {isGerente && (
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  type="button"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  disabled={saveMutation.isPending}
+                  onClick={() => { setError(''); saveMutation.mutate() }}
+                >
+                  {saveMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : 'Guardar'}
+                </Button>
+                {error  && <p className="text-sm text-red-500">{error}</p>}
+                {saved  && <p className="text-sm text-green-500 font-medium">Guardado ✓</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
