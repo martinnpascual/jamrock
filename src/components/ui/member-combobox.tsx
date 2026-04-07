@@ -137,7 +137,7 @@ export function MemberCombobox({
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Buscar por nombre, DNI o número..."
-                className="w-full pl-8 pr-3 py-1.5 text-sm bg-black/40 border border-white/[0.08] rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#2DC814]/40"
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-[#0e0e0e] border border-white/[0.12] rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#2DC814]/40"
               />
             </div>
           </div>

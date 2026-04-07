@@ -118,6 +118,7 @@ function LotCard({
 }) {
   const { data: movements = [], isLoading: loadingMovements } = useLotMovements(expanded ? lot.id : '')
   const deleteMutation = useDeleteStockLot()
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const pct = lot.initial_grams > 0 ? (lot.current_grams / lot.initial_grams) * 100 : 0
   const isEmpty = lot.current_grams <= 0
@@ -214,15 +215,33 @@ function LotCard({
               size="sm"
               variant="outline"
               className="text-red-400 border-red-900/50 hover:bg-red-950/40 h-8 gap-1.5 text-xs"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate(lot.id)}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="w-3.5 h-3.5" />
-              {deleteMutation.isPending ? 'Eliminando...' : 'Dar de baja lote'}
+              Dar de baja lote
             </Button>
           )}
         </div>
       )}
+
+      {/* Confirmación dar de baja lote */}
+      <Dialog open={confirmDelete} onOpenChange={o => { if (!o && !deleteMutation.isPending) setConfirmDelete(false) }}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader><DialogTitle className="text-red-400">¿Dar de baja este lote?</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-400">
+            ¿Estás seguro de que querés dar de baja el lote de <span className="font-semibold text-slate-200">{lot.genetics}</span> ({lot.current_grams.toFixed(1)}g restantes)? Esta acción se puede revertir.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleteMutation.isPending}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={async () => {
+              await deleteMutation.mutateAsync(lot.id)
+              setConfirmDelete(false)
+            }}>
+              {deleteMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Eliminando...</> : 'Dar de baja'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

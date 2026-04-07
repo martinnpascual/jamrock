@@ -63,6 +63,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const deleteSale = useDeleteSale()
   const [open, setOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [confirmDeleteSale, setConfirmDeleteSale] = useState<{ id: string; name: string } | null>(null)
   const today = new Date().toISOString().split('T')[0]
   const todaySales = sales.filter(s => s.created_at.startsWith(today))
   const totalHoy = todaySales.reduce((s, x) => s + x.total, 0)
@@ -114,7 +115,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <p className="text-sm font-bold text-[#2DC814]">{ARS(s.total)}</p>
-                      {isGerente && <button onClick={() => deleteSale.mutate(s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>}
+                      {isGerente && <button onClick={() => setConfirmDeleteSale({ id: s.id, name: prod?.name ?? 'esta venta' })} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   </div>
                 </div>
@@ -168,6 +169,25 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
           </form>
         </DialogContent>
       </Dialog>
+      {/* Confirmación eliminar venta */}
+      <Dialog open={!!confirmDeleteSale} onOpenChange={o => { if (!o && !deleteSale.isPending) setConfirmDeleteSale(null) }}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader><DialogTitle className="text-red-400">¿Eliminar venta?</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-400">
+            ¿Estás seguro de que querés eliminar la venta de <span className="font-semibold text-slate-200">{confirmDeleteSale?.name}</span>? Esta acción se puede revertir.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteSale(null)} disabled={deleteSale.isPending}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteSale.isPending} onClick={async () => {
+              if (!confirmDeleteSale) return
+              await deleteSale.mutateAsync(confirmDeleteSale.id)
+              setConfirmDeleteSale(null)
+            }}>
+              {deleteSale.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -177,6 +197,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   const createProduct = useCreateProduct()
   const deleteProduct = useDeleteProduct()
   const [open, setOpen] = useState(false)
+  const [confirmDeleteProd, setConfirmDeleteProd] = useState<{ id: string; name: string } | null>(null)
   const low = products.filter(p => p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold).length
   const empty = products.filter(p => p.stock_quantity === 0).length
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
@@ -200,7 +221,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
       {isGerente && <div className="flex justify-end"><Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10"><Plus className="w-4 h-4" />Nuevo producto</Button></div>}
       {products.length === 0
         ? <div className="flex flex-col items-center py-16"><Package className="w-10 h-10 text-slate-300 mb-3" /><p className="text-sm text-slate-500">{isGerente ? 'Cargá el primer producto.' : 'El gerente debe cargar productos.'}</p></div>
-        : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.map(p => <ProductCard key={p.id} product={p} isGerente={isGerente} onDelete={() => deleteProduct.mutate(p.id)} />)}</div>}
+        : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.map(p => <ProductCard key={p.id} product={p} isGerente={isGerente} onDelete={() => setConfirmDeleteProd({ id: p.id, name: p.name })} />)}</div>}
       <Dialog open={open} onOpenChange={o => { if (!o) { reset(); setOpen(false) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Nuevo producto</DialogTitle></DialogHeader>
@@ -225,6 +246,25 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* Confirmación eliminar producto */}
+      <Dialog open={!!confirmDeleteProd} onOpenChange={o => { if (!o && !deleteProduct.isPending) setConfirmDeleteProd(null) }}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader><DialogTitle className="text-red-400">¿Eliminar producto?</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-400">
+            ¿Estás seguro de que querés eliminar <span className="font-semibold text-slate-200">{confirmDeleteProd?.name}</span>? Esta acción se puede revertir.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteProd(null)} disabled={deleteProduct.isPending}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteProduct.isPending} onClick={async () => {
+              if (!confirmDeleteProd) return
+              await deleteProduct.mutateAsync(confirmDeleteProd.id)
+              setConfirmDeleteProd(null)
+            }}>
+              {deleteProduct.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

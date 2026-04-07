@@ -125,6 +125,7 @@ export default function ProveedoresPage() {
 function SupplierCard({ supplier: s, expanded, onToggle, isGerente }: { supplier: Supplier; expanded: boolean; onToggle: () => void; isGerente: boolean }) {
   const deleteSupplier = useDeleteSupplier()
   const { data: records = [], isLoading } = useSupplierRecords(expanded ? s.id : '')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const totalSpend = records.reduce((sum, r) => sum + (r.total_cost ?? 0), 0)
 
   return (
@@ -146,7 +147,7 @@ function SupplierCard({ supplier: s, expanded, onToggle, isGerente }: { supplier
         <div className="flex items-center gap-3 flex-shrink-0">
           <Badge variant="outline" className={cn('text-xs border', TYPE_COLORS[s.type])}>{TYPE_LABELS[s.type]}</Badge>
           {isGerente && (
-            <button onClick={() => deleteSupplier.mutate(s.id)} className="text-slate-300 hover:text-red-400">
+            <button onClick={() => setConfirmDelete(true)} className="text-slate-300 hover:text-red-400">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
@@ -184,6 +185,33 @@ function SupplierCard({ supplier: s, expanded, onToggle, isGerente }: { supplier
           </div>
         </div>
       )}
+
+      {/* Confirmación de eliminación */}
+      <Dialog open={confirmDelete} onOpenChange={o => { if (!o && !deleteSupplier.isPending) setConfirmDelete(false) }}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="text-red-400">¿Eliminar proveedor?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-400">
+            ¿Estás seguro de que querés eliminar a <span className="font-semibold text-slate-200">{s.name}</span>? Esta acción se puede revertir.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleteSupplier.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteSupplier.isPending}
+              onClick={async () => {
+                await deleteSupplier.mutateAsync(s.id)
+                setConfirmDelete(false)
+              }}
+            >
+              {deleteSupplier.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

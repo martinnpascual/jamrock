@@ -268,7 +268,7 @@ function AttendeesPanel({ eventId, isGerente, eventStatus }: { eventId: string; 
                 <span className="text-xs font-medium text-slate-700">{a.members ? `${a.members.first_name} ${a.members.last_name}` : '—'}</span>
                 <span className="text-xs text-slate-400 font-mono">{a.members?.member_number}</span>
               </div>
-              {canEdit && <button onClick={() => removeAttendee.mutate({ eventId, attendeeId: a.id })} className="text-slate-300 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
+              {canEdit && <button onClick={() => { if (confirm('¿Quitar este asistente del evento?')) removeAttendee.mutate({ eventId, attendeeId: a.id }) }} className="text-slate-300 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
             </div>
           ))}
           <p className="text-xs text-slate-400">{attendees.filter(a => a.attended).length} de {attendees.length} asistieron</p>

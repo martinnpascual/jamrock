@@ -210,7 +210,7 @@ export function DispensasHistorial() {
             <span>Socio</span>
             <span>Genética</span>
             <span>Gramos</span>
-            <span>Total</span>
+            <span>Abonó</span>
             <span>Pago</span>
             <span>Fecha</span>
             <span>Tipo</span>
@@ -316,6 +316,28 @@ function PaymentStatusBadge({ status, method, discountPct, amountPaid }: {
   )
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mixto: 'Mixto',
+  cuenta_corriente: 'Cuenta corriente',
+}
+
+function buildPriceTooltip(d: DispensationWithMember): string {
+  if (!d.total_amount || d.total_amount <= 0) return ''
+  const lines: string[] = []
+  if (d.price_per_gram && d.price_per_gram > 0) {
+    lines.push(`${d.quantity_grams}g × ${ARS(d.price_per_gram)}/g = ${ARS(d.subtotal ?? d.total_amount)}`)
+  }
+  if (d.discount_percent && d.discount_percent > 0) {
+    lines.push(`Desc: ${d.discount_percent}% (-${ARS(d.discount_amount ?? 0)})`)
+  }
+  if (d.payment_method) {
+    lines.push(PAYMENT_METHOD_LABELS[d.payment_method] ?? d.payment_method)
+  }
+  return lines.join(' · ')
+}
+
 function DispensationRow({
   dispensation: d,
   isGerente,
@@ -386,17 +408,23 @@ function DispensationRow({
             {isAnulacion ? '-' : ''}{d.quantity_grams}g
           </span>
 
-          {/* TOTAL — solo desktop */}
-          <span className="hidden lg:block text-sm tabular-nums">
+          {/* ABONÓ — solo desktop */}
+          <span className="hidden lg:block text-sm tabular-nums" title={buildPriceTooltip(d)}>
             {hasPrice ? (
-              <span className="text-slate-200 font-medium">
-                {ARS(d.total_amount!)}
-                {d.discount_percent && d.discount_percent > 0 && (
-                  <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>
-                )}
-              </span>
+              d.payment_status === 'fiado' ? (
+                <span className="text-yellow-400 font-medium">
+                  {ARS(d.total_amount!)} <span className="text-xs">(Fiado)</span>
+                </span>
+              ) : (
+                <span className="text-green-400 font-medium">
+                  {ARS(d.total_amount!)}
+                  {d.discount_percent && d.discount_percent > 0 && (
+                    <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>
+                  )}
+                </span>
+              )
             ) : (
-              <span className="text-slate-600">—</span>
+              <span className="text-gray-500">—</span>
             )}
           </span>
 
@@ -450,7 +478,11 @@ function DispensationRow({
       <div className="flex items-center gap-2 mt-1 lg:hidden pl-10 flex-wrap">
         <span className="text-xs text-slate-400">{d.genetics}</span>
         <span className="text-slate-600">·</span>
-        {hasPrice && <span className="text-xs text-slate-300 font-medium">{ARS(d.total_amount!)}</span>}
+        {hasPrice && (
+          <span className={cn('text-xs font-medium', d.payment_status === 'fiado' ? 'text-yellow-400' : 'text-green-400')}>
+            {ARS(d.total_amount!)}{d.payment_status === 'fiado' && ' (Fiado)'}
+          </span>
+        )}
         {hasPrice && <span className="text-slate-600">·</span>}
         <PaymentStatusBadge
           status={d.payment_status}
