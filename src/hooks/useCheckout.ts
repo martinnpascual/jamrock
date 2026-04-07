@@ -14,11 +14,12 @@ export interface CartItem {
 }
 
 export interface DispensationInput {
-  lot_id:         string
-  genetics:       string
-  quantity_grams: number
-  notes:          string
-  cost:           number  // gramos × price_per_gram (0 si gratis)
+  lot_id:           string
+  genetics:         string
+  quantity_grams:   number
+  notes:            string
+  cost:             number  // subtotal: gramos × price_per_gram (antes de descuento)
+  discountPercent:  number  // 0 | 5 | 10 | 15 | 20 | 25
 }
 
 export interface CheckoutResult {
@@ -72,7 +73,14 @@ export function useCheckout() {
   const [state, setState] = useState<CheckoutState>(initialState)
 
   // ── Totales calculados ────────────────────────────────────────────────────
-  const dispensationSubtotal = state.dispensation?.cost ?? 0
+  // cost = subtotal bruto; discountPercent reduce el monto final de la dispensa
+  const dispensationSubtotal = useMemo(() => {
+    if (!state.dispensation) return 0
+    const { cost, discountPercent } = state.dispensation
+    const discountAmount = cost * ((discountPercent ?? 0) / 100)
+    return cost - discountAmount
+  }, [state.dispensation])
+
   const productsSubtotal = useMemo(
     () => state.cartItems.reduce((sum, i) => sum + i.subtotal, 0),
     [state.cartItems]
@@ -163,10 +171,11 @@ export function useCheckout() {
     const body = {
       member_id: state.member.id,
       dispensation: {
-        lot_id:         state.dispensation.lot_id,
-        genetics:       state.dispensation.genetics,
-        quantity_grams: state.dispensation.quantity_grams,
-        notes:          state.dispensation.notes || undefined,
+        lot_id:           state.dispensation.lot_id,
+        genetics:         state.dispensation.genetics,
+        quantity_grams:   state.dispensation.quantity_grams,
+        notes:            state.dispensation.notes || undefined,
+        discount_percent: state.dispensation.discountPercent ?? 0,
       },
       items: state.cartItems.map(i => ({
         product_id: i.product_id,

@@ -123,8 +123,16 @@ export async function POST(request: NextRequest) {
   const dispConfig = (configRow?.value as { enabled: boolean; price: number }) ?? { enabled: false, price: 0 }
   const pricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
 
-  // 1f. Calcular totales
-  const dispensationAmount = pricePerGram * dispInput.quantity_grams
+  // 1f. Calcular totales con descuento
+  const dispensationSubtotal = pricePerGram * dispInput.quantity_grams
+  // Validar que el descuento enviado por el frontend sea uno de los valores permitidos
+  const allowedDiscounts = [0, 5, 10, 15, 20, 25]
+  const discountPercent  = allowedDiscounts.includes(dispInput.discount_percent ?? 0)
+    ? (dispInput.discount_percent ?? 0)
+    : 0
+  const discountAmount   = dispensationSubtotal * (discountPercent / 100)
+  const dispensationAmount = dispensationSubtotal - discountAmount
+
   const productsAmount = items.reduce((sum, item) => {
     return sum + (productsMap[item.product_id].price * item.quantity)
   }, 0)
@@ -164,16 +172,28 @@ export async function POST(request: NextRequest) {
   }
 
   // ── PASO 2: CREAR DISPENSA ────────────────────────────────────────────────
+  const isFiadoForDisp  = payment.method === 'cuenta_corriente'
+  const paymentStatusForDisp: 'sin_cargo' | 'pagado' | 'fiado' =
+    totalAmount === 0 ? 'sin_cargo' : isFiadoForDisp ? 'fiado' : 'pagado'
+
   const { data: dispensation, error: dispErr } = await admin
     .from('dispensations')
     .insert({
       member_id,
-      lot_id:         dispInput.lot_id,
-      genetics:       dispInput.genetics,
-      quantity_grams: dispInput.quantity_grams,
-      notes:          dispInput.notes ?? null,
-      type:           'normal',
-      created_by:     user.id,
+      lot_id:           dispInput.lot_id,
+      genetics:         dispInput.genetics,
+      quantity_grams:   dispInput.quantity_grams,
+      notes:            dispInput.notes ?? null,
+      type:             'normal',
+      created_by:       user.id,
+      // Campos de precio (nuevos)
+      price_per_gram:   pricePerGram,
+      subtotal:         dispensationSubtotal,
+      discount_percent: discountPercent,
+      discount_amount:  discountAmount,
+      total_amount:     dispensationAmount,
+      payment_method:   totalAmount === 0 ? null : (isFiadoForDisp ? 'cuenta_corriente' : payment.method),
+      payment_status:   paymentStatusForDisp,
     })
     .select('id, dispensation_number')
     .single()
@@ -353,7 +373,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── PASO 5: CREAR checkout_transaction ────────────────────────────────────
-  const isFiado  = payment.method === 'cuenta_corriente'
+  const isFiado  = isFiadoForDisp
   const isFree   = totalAmount === 0
 
   const { data: transaction, error: txnErr } = await admin

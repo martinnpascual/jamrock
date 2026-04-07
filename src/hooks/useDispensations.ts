@@ -11,7 +11,10 @@ export function useDispensations(limit = 50) {
       const { data, error } = await supabase
         .from('dispensations')
         .select(`
-          *,
+          id, dispensation_number, quantity_grams, genetics, type,
+          notes, created_at,
+          price_per_gram, subtotal, discount_percent, discount_amount,
+          total_amount, payment_method, payment_status,
           members!dispensations_member_id_fkey (
             id, member_number, first_name, last_name, reprocann_status
           )

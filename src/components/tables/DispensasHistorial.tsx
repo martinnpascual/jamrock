@@ -22,6 +22,11 @@ import { Search, Plus, Syringe, Lock, XCircle } from 'lucide-react'
 import type { ReprocannStatus } from '@/types/database'
 import { cn } from '@/lib/utils'
 
+const ARS = (n: number) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
+type PaymentStatus = 'sin_cargo' | 'pagado' | 'fiado' | null | undefined
+
 type DispensationWithMember = {
   id: string
   dispensation_number: string
@@ -30,6 +35,14 @@ type DispensationWithMember = {
   type: 'normal' | 'anulacion'
   notes: string | null
   created_at: string
+  // Campos de precio (pueden ser null en registros viejos)
+  price_per_gram:   number | null
+  subtotal:         number | null
+  discount_percent: number | null
+  discount_amount:  number | null
+  total_amount:     number | null
+  payment_method:   string | null
+  payment_status:   PaymentStatus
   members: {
     id: string
     member_number: string
@@ -52,7 +65,7 @@ export function DispensasHistorial() {
   const [voidError, setVoidError] = useState<string | null>(null)
 
   const dispensations = useMemo(
-    () => (data ?? []) as DispensationWithMember[],
+    () => (data ?? []) as unknown as DispensationWithMember[],
     [data]
   )
 
@@ -190,13 +203,15 @@ export function DispensasHistorial() {
           <div className={cn(
             'hidden gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide',
             isGerente
-              ? 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto_auto]'
-              : 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto]'
+              ? 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_1fr_auto_auto]'
+              : 'lg:grid grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_1fr_auto]'
           )}>
             <span>N°</span>
             <span>Socio</span>
             <span>Genética</span>
             <span>Gramos</span>
+            <span>Total</span>
+            <span>Pago</span>
             <span>Fecha</span>
             <span>Tipo</span>
             {isGerente && <span />}
@@ -268,6 +283,39 @@ export function DispensasHistorial() {
   )
 }
 
+function PaymentStatusBadge({ status, method, discountPct, amountPaid }: {
+  status:      PaymentStatus
+  method:      string | null
+  discountPct: number | null
+  amountPaid:  number | null
+}) {
+  if (!status || status === 'sin_cargo') {
+    return <Badge variant="outline" className="text-xs text-slate-500 border-slate-700">Sin cargo</Badge>
+  }
+  if (status === 'pagado') {
+    const title = [
+      method ? `vía ${method}` : null,
+      amountPaid ? ARS(amountPaid) : null,
+      discountPct && discountPct > 0 ? `Desc: ${discountPct}%` : null,
+    ].filter(Boolean).join(' · ')
+    return (
+      <Badge
+        variant="outline"
+        className="text-xs text-[#2DC814] border-[#2DC814]/30 bg-[#2DC814]/5 cursor-default"
+        title={title}
+      >
+        Pagado
+      </Badge>
+    )
+  }
+  // fiado
+  return (
+    <Badge variant="outline" className="text-xs text-amber-400 border-amber-700/50 bg-amber-950/20">
+      Fiado
+    </Badge>
+  )
+}
+
 function DispensationRow({
   dispensation: d,
   isGerente,
@@ -278,13 +326,14 @@ function DispensationRow({
   onVoid: (d: DispensationWithMember) => void
 }) {
   const isAnulacion = d.type === 'anulacion'
+  const hasPrice    = d.total_amount != null && d.total_amount > 0
 
   return (
     <div className={cn(
       'px-4 py-3 transition-colors',
       isGerente
-        ? 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto_auto] lg:gap-4 lg:items-center'
-        : 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center',
+        ? 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_1fr_auto_auto] lg:gap-4 lg:items-center'
+        : 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center',
       isAnulacion ? 'bg-red-950/20 opacity-80' : 'hover:bg-white/[0.02]'
     )}>
       {/* Mobile layout — row with all info */}
@@ -310,7 +359,7 @@ function DispensationRow({
                   >
                     {d.members.first_name} {d.members.last_name}
                   </Link>
-                  {/* Mobile: show N° and member_number inline */}
+                  {/* Mobile: N° + member_number inline */}
                   <p className="text-xs text-slate-500 lg:hidden">
                     <span className="font-mono font-semibold text-slate-400">{d.dispensation_number}</span>
                     {' · '}
@@ -324,7 +373,7 @@ function DispensationRow({
           </div>
         </div>
 
-        {/* Right side on mobile: grams + badge + action */}
+        {/* Right side on mobile: grams + badges + action */}
         <div className="flex items-center gap-2 flex-shrink-0 lg:contents">
           {/* Genética — hidden on mobile */}
           <span className="hidden lg:block text-sm text-slate-300">{d.genetics}</span>
@@ -335,6 +384,30 @@ function DispensationRow({
             isAnulacion ? 'text-red-400' : 'text-slate-100'
           )}>
             {isAnulacion ? '-' : ''}{d.quantity_grams}g
+          </span>
+
+          {/* TOTAL — solo desktop */}
+          <span className="hidden lg:block text-sm tabular-nums">
+            {hasPrice ? (
+              <span className="text-slate-200 font-medium">
+                {ARS(d.total_amount!)}
+                {d.discount_percent && d.discount_percent > 0 && (
+                  <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-slate-600">—</span>
+            )}
+          </span>
+
+          {/* PAGO badge — solo desktop */}
+          <span className="hidden lg:block">
+            <PaymentStatusBadge
+              status={d.payment_status}
+              method={d.payment_method}
+              discountPct={d.discount_percent}
+              amountPaid={d.total_amount}
+            />
           </span>
 
           {/* Fecha — hidden on mobile */}
@@ -373,9 +446,18 @@ function DispensationRow({
         </div>
       </div>
 
-      {/* Mobile: genetics + date — second line */}
-      <div className="flex items-center gap-2 mt-1 lg:hidden pl-10">
+      {/* Mobile: genetics + date + pago — second line */}
+      <div className="flex items-center gap-2 mt-1 lg:hidden pl-10 flex-wrap">
         <span className="text-xs text-slate-400">{d.genetics}</span>
+        <span className="text-slate-600">·</span>
+        {hasPrice && <span className="text-xs text-slate-300 font-medium">{ARS(d.total_amount!)}</span>}
+        {hasPrice && <span className="text-slate-600">·</span>}
+        <PaymentStatusBadge
+          status={d.payment_status}
+          method={d.payment_method}
+          discountPct={d.discount_percent}
+          amountPaid={d.total_amount}
+        />
         <span className="text-slate-600">·</span>
         <span className="text-xs text-slate-500">
           {new Date(d.created_at).toLocaleDateString('es-AR', {

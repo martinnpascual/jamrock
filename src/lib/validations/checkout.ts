@@ -35,10 +35,13 @@ export const checkoutRequestSchema = z.object({
   member_id: z.string().uuid('ID de socio inválido'),
 
   dispensation: z.object({
-    lot_id:         z.string().uuid('ID de lote inválido'),
-    genetics:       z.string().min(1, 'La genética es requerida').max(100),
-    quantity_grams: z.number().positive('Los gramos deben ser mayores a 0').max(500),
-    notes:          z.string().max(500).optional(),
+    lot_id:           z.string().uuid('ID de lote inválido'),
+    genetics:         z.string().min(1, 'La genética es requerida').max(100),
+    quantity_grams:   z.number().positive('Los gramos deben ser mayores a 0').max(500),
+    notes:            z.string().max(500).optional(),
+    discount_percent: z.number().int().refine(v => [0,5,10,15,20,25].includes(v), {
+      message: 'El descuento solo puede ser 0, 5, 10, 15, 20 o 25',
+    }).optional().default(0),
   }),
 
   items: z.array(checkoutItemSchema).optional().default([]),

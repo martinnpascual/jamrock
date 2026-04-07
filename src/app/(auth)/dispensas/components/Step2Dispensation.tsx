@@ -7,13 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Leaf, ShoppingCart, AlertTriangle } from 'lucide-react'
+import { Leaf, ShoppingCart, AlertTriangle, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DispensationInput } from '@/hooks/useCheckout'
 import type { DispensationConfig } from '@/hooks/useDispensationConfig'
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
+const DISCOUNT_OPTIONS = [5, 10, 15, 20, 25] as const
 
 interface Step2Props {
   config:          DispensationConfig | undefined
@@ -23,26 +25,32 @@ interface Step2Props {
 
 export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Step2Props) {
   const { data: lots = [], isLoading } = useAllStockLots()
-  const [lotId, setLotId]               = useState('')
-  const [gramsStr, setGramsStr]         = useState('')
-  const [notes, setNotes]               = useState('')
-  const [error, setError]               = useState<string | null>(null)
+  const [lotId, setLotId]                 = useState('')
+  const [gramsStr, setGramsStr]           = useState('')
+  const [notes, setNotes]                 = useState('')
+  const [error, setError]                 = useState<string | null>(null)
+  const [discountPercent, setDiscount]    = useState<0 | 5 | 10 | 15 | 20 | 25>(0)
+  const [applyDiscount, setApplyDiscount] = useState(false)
 
   const activeLots = useMemo(
     () => lots.filter(l => !l.is_deleted && l.current_grams > 0),
     [lots]
   )
 
-  const selectedLot = activeLots.find(l => l.id === lotId)
-  const gramsNum    = parseFloat(gramsStr) || 0
+  const selectedLot  = activeLots.find(l => l.id === lotId)
+  const gramsNum     = parseFloat(gramsStr) || 0
   const pricePerGram = config?.enabled ? config.pricePerGram : 0
-  const dispensaCost = pricePerGram * gramsNum
+  const subtotal     = pricePerGram * gramsNum
+  const activeDiscount = applyDiscount ? discountPercent : 0
+  const discountAmount = subtotal * (activeDiscount / 100)
+  const totalFinal   = subtotal - discountAmount
+
+  // Reset descuento al deshabilitar
+  useEffect(() => { if (!applyDiscount) setDiscount(0) }, [applyDiscount])
 
   // Si solo hay un lote, pre-seleccionar
   useEffect(() => {
-    if (activeLots.length === 1 && !lotId) {
-      setLotId(activeLots[0].id)
-    }
+    if (activeLots.length === 1 && !lotId) setLotId(activeLots[0].id)
   }, [activeLots, lotId])
 
   function validate(): DispensationInput | null {
@@ -55,11 +63,12 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
       return null
     }
     return {
-      lot_id:         lotId,
-      genetics:       selectedLot.genetics,
-      quantity_grams: gramsNum,
+      lot_id:          lotId,
+      genetics:        selectedLot.genetics,
+      quantity_grams:  gramsNum,
       notes,
-      cost:           dispensaCost,
+      cost:            subtotal,          // subtotal bruto (antes de descuento)
+      discountPercent: activeDiscount,    // 0 si no aplica descuento
     }
   }
 
@@ -124,14 +133,64 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
         )}
       </div>
 
-      {/* Costo de dispensa (si está habilitado) */}
+      {/* ── Precio y descuento (solo si config.enabled y gramsNum > 0) ── */}
       {config?.enabled && gramsNum > 0 && (
-        <div className="bg-[#2DC814]/5 border border-[#2DC814]/20 rounded-lg p-3 flex justify-between items-center">
-          <div>
-            <p className="text-xs text-slate-400">Costo de dispensa</p>
-            <p className="text-xs text-slate-500 mt-0.5">{gramsNum}g × {ARS(pricePerGram)}/g</p>
+        <div className="space-y-3 border border-white/[0.08] rounded-xl p-4 bg-white/[0.02]">
+          {/* Subtotal */}
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-slate-400">{gramsNum}g × {ARS(pricePerGram)}/g</span>
+            <span className="text-slate-200 font-medium">{ARS(subtotal)}</span>
           </div>
-          <p className="text-lg font-bold text-[#2DC814]">{ARS(dispensaCost)}</p>
+
+          {/* Toggle descuento */}
+          <button
+            type="button"
+            onClick={() => setApplyDiscount(v => !v)}
+            className={cn(
+              'flex items-center gap-2 text-sm font-medium transition-colors rounded-lg px-3 py-1.5 border',
+              applyDiscount
+                ? 'text-amber-400 border-amber-800/50 bg-amber-950/20'
+                : 'text-slate-500 border-white/[0.08] hover:text-slate-300 hover:border-white/20'
+            )}
+          >
+            <Tag className="w-3.5 h-3.5" />
+            {applyDiscount ? 'Descuento activado' : '+ Aplicar descuento'}
+          </button>
+
+          {/* Chips de descuento */}
+          {applyDiscount && (
+            <div className="flex flex-wrap gap-2">
+              {DISCOUNT_OPTIONS.map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => setDiscount(pct)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-sm font-semibold border transition-all',
+                    discountPercent === pct
+                      ? 'bg-amber-500 border-amber-500 text-black'
+                      : 'border-white/10 text-slate-400 hover:border-amber-500/50 hover:text-amber-400'
+                  )}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Desglose con descuento */}
+          {applyDiscount && discountPercent > 0 && (
+            <div className="flex justify-between items-center text-sm text-amber-400">
+              <span>Descuento {discountPercent}%</span>
+              <span>- {ARS(discountAmount)}</span>
+            </div>
+          )}
+
+          {/* Divisor + Total */}
+          <div className="border-t border-white/[0.06] pt-2 flex justify-between items-center">
+            <span className="text-sm font-semibold text-slate-300">Total dispensa</span>
+            <span className="text-xl font-bold text-[#2DC814]">{ARS(totalFinal)}</span>
+          </div>
         </div>
       )}
 

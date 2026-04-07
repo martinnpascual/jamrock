@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { MemberCombobox } from '@/components/ui/member-combobox'
 import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -61,6 +62,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const createSale = useCreateSale()
   const deleteSale = useDeleteSale()
   const [open, setOpen] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const today = new Date().toISOString().split('T')[0]
   const todaySales = sales.filter(s => s.created_at.startsWith(today))
   const totalHoy = todaySales.reduce((s, x) => s + x.total, 0)
@@ -73,6 +75,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
     try {
       await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price || 0 })
       reset()
+      setSelectedMemberId(null)
       setOpen(false)
     } catch { /* error shown via createSale.error */ }
   }
@@ -119,7 +122,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
             })}
           </div>
         )}
-      <Dialog open={open} onOpenChange={o => { if (!o) { reset(); setOpen(false) } }}>
+      <Dialog open={open} onOpenChange={o => { if (!o) { reset(); setSelectedMemberId(null); setOpen(false) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Registrar venta</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -136,11 +139,16 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
               <div className="space-y-1.5"><Label>Precio unit. *</Label><Input type="number" step="0.01" {...register('unit_price')} />{errors.unit_price && <p className="text-xs text-red-500">{errors.unit_price.message}</p>}</div>
             </div>
             <div className="space-y-1.5">
-              <Label>Socio (opcional)</Label>
-              <Select onValueChange={v => setValue('member_id', v === 'none' ? null : v as string)}>
-                <SelectTrigger><SelectValue placeholder="Sin socio asociado" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">Sin socio</SelectItem>{members.map(m => <SelectItem key={m.id} value={m.id}>{m.first_name} {m.last_name} · {m.member_number}</SelectItem>)}</SelectContent>
-              </Select>
+              <Label>Socio <span className="text-slate-500 font-normal">(opcional)</span></Label>
+              <MemberCombobox
+                members={members}
+                value={selectedMemberId}
+                onChange={id => {
+                  setSelectedMemberId(id)
+                  setValue('member_id', id)
+                }}
+                placeholder="Sin socio asociado"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Método de pago *</Label>
