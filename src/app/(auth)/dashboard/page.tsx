@@ -85,7 +85,6 @@ export default async function DashboardPage() {
 
   const ventasHoyTotal = (ventasHoyRes.data ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
   const fiadoHoyTotal  = (fiadoHoyRes.data  ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
-  const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
   type Alert = { msg: string; href: string; color: string }
   const alerts: Alert[] = []

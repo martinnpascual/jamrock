@@ -141,7 +141,7 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
       {searched && results.length === 0 && !loading && !selected && (
         <div className="flex flex-col items-center py-8 text-center">
           <User className="w-10 h-10 text-slate-600 mb-2" />
-          <p className="text-sm text-slate-400">Sin resultados para "{query}"</p>
+          <p className="text-sm text-slate-400">Sin resultados para &quot;{query}&quot;</p>
           <p className="text-xs text-slate-500 mt-1">Probá con otro nombre, DNI o número de socio</p>
         </div>
       )}

@@ -25,9 +25,8 @@ function ProgressBar({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-1 mb-6">
       {STEPS.map(({ num, label, Icon }, idx) => {
-        const done    = num < current
-        const active  = num === current
-        const pending = num > current
+        const done   = num < current
+        const active = num === current
 
         return (
           <div key={num} className="flex items-center flex-1 last:flex-none">

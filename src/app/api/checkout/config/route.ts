@@ -80,44 +80,22 @@ export async function PUT(request: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const updates: Promise<unknown>[] = []
+  const ts = new Date().toISOString()
+
+  const upsertOne = (key: string, value: unknown) =>
+    admin.from('app_config').upsert({ key, value, updated_by: user.id, updated_at: ts })
 
   if (parsed.data.dispensation_price_per_gram !== undefined) {
-    updates.push(
-      admin.from('app_config').upsert({
-        key:        'dispensation_price_per_gram',
-        value:      parsed.data.dispensation_price_per_gram,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      })
-    )
+    const { error } = await upsertOne('dispensation_price_per_gram', parsed.data.dispensation_price_per_gram)
+    if (error) return NextResponse.json({ error: 'Error al guardar dispensation_price_per_gram' }, { status: 500 })
   }
   if (parsed.data.checkout_allow_credit !== undefined) {
-    updates.push(
-      admin.from('app_config').upsert({
-        key:        'checkout_allow_credit',
-        value:      parsed.data.checkout_allow_credit,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      })
-    )
+    const { error } = await upsertOne('checkout_allow_credit', parsed.data.checkout_allow_credit)
+    if (error) return NextResponse.json({ error: 'Error al guardar checkout_allow_credit' }, { status: 500 })
   }
   if (parsed.data.checkout_show_cc_balance !== undefined) {
-    updates.push(
-      admin.from('app_config').upsert({
-        key:        'checkout_show_cc_balance',
-        value:      parsed.data.checkout_show_cc_balance,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      })
-    )
-  }
-
-  const results = await Promise.all(updates)
-  const hasError = results.some((r: unknown) => (r as { error?: unknown }).error)
-
-  if (hasError) {
-    return NextResponse.json({ error: 'Error al guardar configuración' }, { status: 500 })
+    const { error } = await upsertOne('checkout_show_cc_balance', parsed.data.checkout_show_cc_balance)
+    if (error) return NextResponse.json({ error: 'Error al guardar checkout_show_cc_balance' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })

@@ -85,7 +85,7 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
             <p className="text-sm text-amber-300">Sin lotes con stock disponible</p>
           </div>
         ) : (
-          <Select value={lotId} onValueChange={setLotId}>
+          <Select value={lotId} onValueChange={v => setLotId(v ?? '')}>
             <SelectTrigger className="h-11 w-full">
               <span className={cn('flex-1 text-left text-sm', lotId ? 'text-slate-100' : 'text-slate-500')}>
                 {selectedLotLabel}
