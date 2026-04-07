@@ -125,7 +125,8 @@ export default function ReportesPage() {
       downloadCSV(salesCSV, `ventas_${stamp}.csv`)
       const paymentsCSV = toCSV(fd.payments.map(p => {
         const m = Array.isArray(p.members) ? p.members[0] : p.members
-        return [m ? `${m.first_name} ${m.last_name}` : '', p.amount, p.concept, p.payment_method, new Date(p.created_at).toLocaleDateString('es-AR')]
+        const conceptLabel = p.concept === 'checkout' ? 'Dispensa' : p.concept === 'cuota' ? 'Cuota' : p.concept
+        return [m ? `${m.first_name} ${m.last_name}` : '', p.amount, conceptLabel, p.payment_method, new Date(p.created_at).toLocaleDateString('es-AR')]
       }), ['Socio', 'Monto', 'Concepto', 'Método', 'Fecha'])
       downloadCSV(paymentsCSV, `pagos_${stamp}.csv`)
     }
@@ -339,7 +340,7 @@ function FinancieroTable({ data }: { data: FinancieroData }) {
                   <tr key={i} className="hover:bg-slate-50">
                     <TD>{m ? `${m.first_name} ${m.last_name}` : '—'}</TD>
                     <TD><span className="font-semibold text-green-700">{ARS(p.amount)}</span></TD>
-                    <TD className="capitalize">{p.concept.replace('_', ' ')}</TD>
+                    <TD className="capitalize">{p.concept === 'checkout' ? 'Dispensa' : p.concept === 'cuota' ? 'Cuota' : p.concept.replace('_', ' ')}</TD>
                     <TD className="capitalize">{p.payment_method ?? '—'}</TD>
                     <TD className="text-slate-400">{new Date(p.created_at).toLocaleDateString('es-AR')}</TD>
                   </tr>
