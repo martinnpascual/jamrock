@@ -7,9 +7,9 @@ import type { MemberFormData } from '@/lib/validations/member'
 
 const QUERY_KEY = 'members'
 
-export function useMembers() {
+export function useMembers(limit = 500) {
   return useQuery({
-    queryKey: [QUERY_KEY],
+    queryKey: [QUERY_KEY, limit],
     queryFn: async (): Promise<Member[]> => {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -17,6 +17,7 @@ export function useMembers() {
         .select('*')
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
+        .limit(limit)
 
       if (error) throw error
       return data ?? []
@@ -48,33 +49,22 @@ export function useCreateMember() {
 
   return useMutation({
     mutationFn: async (formData: MemberFormData) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No autenticado')
-
-      const payload = {
-        ...formData,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        birth_date: formData.birth_date || null,
-        address: formData.address || null,
-        reprocann_expiry: formData.reprocann_expiry || null,
-        reprocann_number: formData.reprocann_number || null,
-        notes: formData.notes || null,
-        created_by: user.id,
+      const res = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error ?? 'Error al crear socio')
       }
-
-      const { data, error } = await supabase
-        .from('members')
-        .insert(payload)
-        .select()
-        .single()
-
-      if (error) throw error
-      return data as Member
+      return res.json() as Promise<Member>
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] })
+    },
+    onError: (error: Error) => {
+      console.error('Error al crear socio:', error.message)
     },
   })
 }
@@ -118,21 +108,11 @@ export function useDeleteMember() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No autenticado')
-
-      // Soft delete — nunca DELETE físico
-      const { error } = await supabase
-        .from('members')
-        .update({
-          is_deleted: true,
-          deleted_at: new Date().toISOString(),
-          deleted_by: user.id,
-        })
-        .eq('id', id)
-
-      if (error) throw error
+      const res = await fetch(`/api/members?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error ?? 'Error al eliminar socio')
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] })

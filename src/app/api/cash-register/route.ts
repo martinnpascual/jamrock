@@ -8,6 +8,12 @@ export async function GET() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+  // Solo gerente y secretaria pueden ver la caja
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos para ver caja' }, { status: 403 })
+  }
+
   const today = new Date().toISOString().split('T')[0]
   const admin = createAdminClient()
 

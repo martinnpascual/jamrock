@@ -31,6 +31,7 @@ function useReportData(type: ReportType, from: string, to: string) {
           .select('dispensation_number, quantity_grams, genetics, type, created_at, members!dispensations_member_id_fkey(first_name, last_name, member_number)')
           .gte('created_at', range.from).lte('created_at', range.to)
           .order('created_at', { ascending: false })
+          .limit(500)
         return data ?? []
       }
       if (type === 'socios') {
@@ -39,6 +40,7 @@ function useReportData(type: ReportType, from: string, to: string) {
           .select('member_number, first_name, last_name, reprocann_status, member_type, created_at')
           .eq('is_deleted', false)
           .order('member_number')
+          .limit(500)
         return data ?? []
       }
       if (type === 'financiero') {
@@ -46,11 +48,13 @@ function useReportData(type: ReportType, from: string, to: string) {
           supabase.from('sales')
             .select('total, payment_method, created_at, commercial_products!sales_product_id_fkey(name)')
             .eq('is_deleted', false).gte('created_at', range.from).lte('created_at', range.to)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .limit(500),
           supabase.from('payments')
             .select('amount, concept, payment_method, created_at, members!payments_member_id_fkey(first_name, last_name)')
             .eq('is_deleted', false).gte('created_at', range.from).lte('created_at', range.to)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .limit(500),
         ])
         return { sales: sales.data ?? [], payments: payments.data ?? [] }
       }
@@ -60,6 +64,7 @@ function useReportData(type: ReportType, from: string, to: string) {
           .select('genetics, initial_grams, current_grams, lot_date, cost_per_gram')
           .eq('is_deleted', false)
           .order('lot_date', { ascending: false })
+          .limit(200)
         return data ?? []
       }
       return []
@@ -143,10 +148,10 @@ export default function ReportesPage() {
     <div className="space-y-5 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Reportes</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Exportá datos en CSV para análisis externos</p>
+          <h2 className="text-lg font-semibold text-foreground">Reportes</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Exportá datos en CSV para análisis externos</p>
         </div>
-        <Button onClick={handleExport} disabled={isLoading || !data} variant="outline" className="gap-2 h-10 border-green-300 text-green-700 hover:bg-green-50">
+        <Button onClick={handleExport} disabled={isLoading || !data} variant="outline" className="gap-2 h-10 border-[#2DC814]/30 text-[#2DC814] hover:bg-[#2DC814]/10">
           <Download className="w-4 h-4" />
           Exportar CSV
         </Button>
@@ -160,40 +165,40 @@ export default function ReportesPage() {
             onClick={() => setType(id)}
             className={cn(
               'text-left p-4 rounded-xl border-2 transition-all',
-              type === id ? 'border-green-500 bg-green-50' : 'border-slate-200 bg-white hover:border-slate-300'
+              type === id ? 'border-[#2DC814]/50 bg-[#2DC814]/5' : 'border-white/[0.06] bg-[#111111] hover:border-white/[0.12]'
             )}
           >
             <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2',
-              type === id ? 'bg-green-100' : 'bg-slate-100')}>
-              <Icon className={cn('w-4 h-4', type === id ? 'text-green-600' : 'text-slate-500')} />
+              type === id ? 'bg-[#2DC814]/15' : 'bg-white/5')}>
+              <Icon className={cn('w-4 h-4', type === id ? 'text-[#2DC814]' : 'text-slate-500')} />
             </div>
-            <p className={cn('text-sm font-semibold', type === id ? 'text-green-700' : 'text-slate-700')}>{label}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
+            <p className={cn('text-sm font-semibold', type === id ? 'text-[#2DC814]' : 'text-slate-200')}>{label}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
           </button>
         ))}
       </div>
 
       {/* Rango de fechas (solo los que lo usan) */}
       {(type === 'dispensas' || type === 'financiero') && (
-        <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3 border border-white/[0.06]">
           <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-500">Período:</span>
             <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-              className="text-sm border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-400" />
-            <span className="text-xs text-slate-400">hasta</span>
+              className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
+            <span className="text-xs text-slate-500">hasta</span>
             <input type="date" value={to} onChange={e => setTo(e.target.value)}
-              className="text-sm border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-400" />
+              className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
           </div>
         </div>
       )}
 
       {/* Tabla de resultados */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div className="bg-[#111111] border border-white/[0.06] rounded-xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-semibold text-slate-700">
+            <span className="text-sm font-semibold text-slate-200">
               {REPORTS.find(r => r.id === type)?.label}
             </span>
           </div>
@@ -228,10 +233,10 @@ type FinancieroData = { sales: { total: number; payment_method: string | null; c
 type StockRow = { genetics: string; initial_grams: number; current_grams: number; cost_per_gram: number | null; lot_date: string }
 
 const TH = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <th className={cn('px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50', className)}>{children}</th>
+  <th className={cn('px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-white/[0.02]', className)}>{children}</th>
 )
 const TD = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <td className={cn('px-4 py-3 text-sm text-slate-700 border-b border-slate-50', className)}>{children}</td>
+  <td className={cn('px-4 py-3 text-sm text-slate-300 border-b border-white/[0.04]', className)}>{children}</td>
 )
 
 function DispensasTable({ data }: { data: DispensaRow[] }) {
@@ -239,7 +244,7 @@ function DispensasTable({ data }: { data: DispensaRow[] }) {
   const total = data.filter(d => d.type === 'normal').reduce((s, d) => s + d.quantity_grams, 0)
   return (
     <>
-      <div className="px-5 py-3 bg-green-50 border-b border-green-100 text-sm text-green-700">
+      <div className="px-5 py-3 bg-[#2DC814]/5 border-b border-[#2DC814]/10 text-sm text-[#2DC814]">
         Total dispensado: <strong>{total.toFixed(1)}g</strong> en {data.filter(d => d.type === 'normal').length} dispensas
       </div>
       <table className="w-full">
@@ -248,12 +253,12 @@ function DispensasTable({ data }: { data: DispensaRow[] }) {
           {data.map(d => {
             const m = Array.isArray(d.members) ? (d.members as unknown[])[0] as typeof d.members : d.members
             return (
-              <tr key={d.dispensation_number} className={cn('hover:bg-slate-50', d.type === 'anulacion' && 'opacity-50')}>
+              <tr key={d.dispensation_number} className={cn('hover:bg-white/[0.02]', d.type === 'anulacion' && 'opacity-50')}>
                 <TD><span className="font-mono text-xs">{d.dispensation_number}</span></TD>
                 <TD>{m ? `${m.first_name} ${m.last_name}` : '—'}</TD>
                 <TD><span className="font-semibold">{d.quantity_grams}g</span></TD>
                 <TD>{d.genetics}</TD>
-                <TD>{d.type === 'anulacion' ? <Badge variant="outline" className="text-xs text-red-600 border-red-200">Anulada</Badge> : <Badge variant="outline" className="text-xs text-green-700 border-green-200">Normal</Badge>}</TD>
+                <TD>{d.type === 'anulacion' ? <Badge variant="outline" className="text-xs text-red-400 border-red-500/20">Anulada</Badge> : <Badge variant="outline" className="text-xs text-[#2DC814] border-[#2DC814]/20">Normal</Badge>}</TD>
                 <TD className="text-slate-400">{new Date(d.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</TD>
               </tr>
             )
@@ -265,10 +270,10 @@ function DispensasTable({ data }: { data: DispensaRow[] }) {
 }
 
 const REPROCANN_COLORS: Record<string, string> = {
-  activo: 'text-green-700 border-green-200 bg-green-50',
-  en_tramite: 'text-yellow-700 border-yellow-200 bg-yellow-50',
-  vencido: 'text-red-600 border-red-200 bg-red-50',
-  cancelado: 'text-slate-500 border-slate-200',
+  activo: 'text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10',
+  en_tramite: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10',
+  vencido: 'text-red-400 border-red-500/20 bg-red-500/10',
+  cancelado: 'text-slate-500 border-white/10',
 }
 
 function SociosTable({ data }: { data: SocioRow[] }) {
@@ -276,14 +281,14 @@ function SociosTable({ data }: { data: SocioRow[] }) {
   const activos = data.filter(d => d.reprocann_status === 'activo').length
   return (
     <>
-      <div className="px-5 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700">
+      <div className="px-5 py-3 bg-sky-500/5 border-b border-sky-500/10 text-sm text-sky-400">
         {data.length} socios · <strong>{activos} con REPROCANN activo</strong>
       </div>
       <table className="w-full">
         <thead><tr><TH>N° Socio</TH><TH>Nombre</TH><TH>REPROCANN</TH><TH>Tipo</TH><TH>Alta</TH></tr></thead>
         <tbody>
           {data.map(d => (
-            <tr key={d.member_number} className="hover:bg-slate-50">
+            <tr key={d.member_number} className="hover:bg-white/[0.02]">
               <TD><span className="font-mono text-xs font-semibold">{d.member_number}</span></TD>
               <TD>{d.first_name} {d.last_name}</TD>
               <TD><Badge variant="outline" className={cn('text-xs border capitalize', REPROCANN_COLORS[d.reprocann_status] ?? '')}>{d.reprocann_status.replace('_', ' ')}</Badge></TD>
@@ -302,23 +307,23 @@ function FinancieroTable({ data }: { data: FinancieroData }) {
   const totalPayments = data.payments.reduce((s, x) => s + x.amount, 0)
   return (
     <>
-      <div className="px-5 py-3 bg-green-50 border-b border-green-100 text-sm text-green-700 flex gap-6">
+      <div className="px-5 py-3 bg-[#2DC814]/5 border-b border-[#2DC814]/10 text-sm text-[#2DC814] flex gap-6">
         <span>Ventas: <strong>{ARS(totalSales)}</strong> ({data.sales.length})</span>
         <span>Pagos: <strong>{ARS(totalPayments)}</strong> ({data.payments.length})</span>
         <span className="font-bold">Total: {ARS(totalSales + totalPayments)}</span>
       </div>
       {data.sales.length > 0 && (
         <>
-          <div className="px-4 py-2 bg-slate-100 text-xs font-semibold text-slate-500 uppercase">Ventas</div>
+          <div className="px-4 py-2 bg-white/[0.03] text-xs font-semibold text-slate-500 uppercase">Ventas</div>
           <table className="w-full">
             <thead><tr><TH>Producto</TH><TH>Total</TH><TH>Método</TH><TH>Fecha</TH></tr></thead>
             <tbody>
               {data.sales.map((s, i) => {
                 const p = Array.isArray(s.commercial_products) ? (s.commercial_products as unknown[])[0] as typeof s.commercial_products : s.commercial_products
                 return (
-                  <tr key={i} className="hover:bg-slate-50">
+                  <tr key={i} className="hover:bg-white/[0.02]">
                     <TD>{p?.name ?? '—'}</TD>
-                    <TD><span className="font-semibold text-green-700">{ARS(s.total)}</span></TD>
+                    <TD><span className="font-semibold text-[#2DC814]">{ARS(s.total)}</span></TD>
                     <TD className="capitalize">{s.payment_method ?? '—'}</TD>
                     <TD className="text-slate-400">{new Date(s.created_at).toLocaleDateString('es-AR')}</TD>
                   </tr>
@@ -330,16 +335,16 @@ function FinancieroTable({ data }: { data: FinancieroData }) {
       )}
       {data.payments.length > 0 && (
         <>
-          <div className="px-4 py-2 bg-slate-100 text-xs font-semibold text-slate-500 uppercase">Pagos de socios</div>
+          <div className="px-4 py-2 bg-white/[0.03] text-xs font-semibold text-slate-500 uppercase">Pagos de socios</div>
           <table className="w-full">
             <thead><tr><TH>Socio</TH><TH>Monto</TH><TH>Concepto</TH><TH>Método</TH><TH>Fecha</TH></tr></thead>
             <tbody>
               {data.payments.map((p, i) => {
                 const m = Array.isArray(p.members) ? (p.members as unknown[])[0] as typeof p.members : p.members
                 return (
-                  <tr key={i} className="hover:bg-slate-50">
+                  <tr key={i} className="hover:bg-white/[0.02]">
                     <TD>{m ? `${m.first_name} ${m.last_name}` : '—'}</TD>
-                    <TD><span className="font-semibold text-green-700">{ARS(p.amount)}</span></TD>
+                    <TD><span className="font-semibold text-[#2DC814]">{ARS(p.amount)}</span></TD>
                     <TD className="capitalize">{p.concept === 'checkout' ? 'Dispensa' : p.concept === 'cuota' ? 'Cuota' : p.concept.replace('_', ' ')}</TD>
                     <TD className="capitalize">{p.payment_method ?? '—'}</TD>
                     <TD className="text-slate-400">{new Date(p.created_at).toLocaleDateString('es-AR')}</TD>
@@ -361,7 +366,7 @@ function StockTable({ data }: { data: StockRow[] }) {
   const totalInicial = data.reduce((s, d) => s + d.initial_grams, 0)
   return (
     <>
-      <div className="px-5 py-3 bg-green-50 border-b border-green-100 text-sm text-green-700">
+      <div className="px-5 py-3 bg-[#2DC814]/5 border-b border-[#2DC814]/10 text-sm text-[#2DC814]">
         Stock total: <strong>{totalActual.toFixed(1)}g disponibles</strong> de {totalInicial.toFixed(0)}g originales
       </div>
       <table className="w-full">
@@ -370,14 +375,14 @@ function StockTable({ data }: { data: StockRow[] }) {
           {data.map((d, i) => {
             const pct = d.initial_grams > 0 ? (d.current_grams / d.initial_grams) * 100 : 0
             return (
-              <tr key={i} className="hover:bg-slate-50">
+              <tr key={i} className="hover:bg-white/[0.02]">
                 <TD><span className="font-medium">{d.genetics}</span></TD>
                 <TD>{d.initial_grams.toFixed(0)}g</TD>
-                <TD><span className={cn('font-semibold', d.current_grams <= 0 ? 'text-red-500' : d.current_grams < 50 ? 'text-yellow-600' : 'text-green-700')}>{d.current_grams.toFixed(1)}g</span></TD>
+                <TD><span className={cn('font-semibold', d.current_grams <= 0 ? 'text-red-400' : d.current_grams < 50 ? 'text-yellow-400' : 'text-[#2DC814]')}>{d.current_grams.toFixed(1)}g</span></TD>
                 <TD className="text-slate-500">{(d.initial_grams - d.current_grams).toFixed(1)}g</TD>
                 <TD>
                   <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
                       <div className={cn('h-full rounded-full', pct < 20 ? 'bg-red-400' : pct < 50 ? 'bg-yellow-400' : 'bg-green-500')} style={{ width: `${Math.min(100, pct)}%` }} />
                     </div>
                     <span className="text-xs text-slate-500">{pct.toFixed(0)}%</span>
@@ -397,8 +402,8 @@ function StockTable({ data }: { data: StockRow[] }) {
 function EmptyReport() {
   return (
     <div className="flex flex-col items-center py-12 text-center">
-      <FileText className="w-8 h-8 text-slate-300 mb-2" />
-      <p className="text-sm text-slate-400">Sin datos para el período seleccionado</p>
+      <FileText className="w-8 h-8 text-slate-600 mb-2" />
+      <p className="text-sm text-slate-500">Sin datos para el período seleccionado</p>
     </div>
   )
 }

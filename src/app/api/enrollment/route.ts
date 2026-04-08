@@ -22,9 +22,32 @@ export async function POST(request: NextRequest) {
 
   const { first_name, last_name, dni, email, phone, birth_date, address, reprocann_status, reprocann_number, additional_info } = parsed.data
 
-  // Usar adminClient para bypasear RLS (la política INSERT pública debería funcionar
-  // con anonClient, pero adminClient garantiza el insert en todos los entornos)
   const admin = createAdminClient()
+
+  // Verificar que no exista una solicitud pendiente con el mismo DNI
+  const { data: existing } = await admin
+    .from('enrollment_requests')
+    .select('id')
+    .eq('dni', dni)
+    .eq('status', 'pendiente')
+    .maybeSingle()
+
+  if (existing) {
+    return NextResponse.json({ error: 'Ya existe una solicitud pendiente con este DNI' }, { status: 409 })
+  }
+
+  // Verificar que no exista un socio activo con el mismo DNI
+  const { data: existingMember } = await admin
+    .from('members')
+    .select('id')
+    .eq('dni', dni)
+    .eq('is_deleted', false)
+    .maybeSingle()
+
+  if (existingMember) {
+    return NextResponse.json({ error: 'Ya existe un socio registrado con este DNI' }, { status: 409 })
+  }
+
   const { data, error } = await admin
     .from('enrollment_requests')
     .insert({

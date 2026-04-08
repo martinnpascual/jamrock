@@ -36,7 +36,8 @@ export async function PATCH(request: Request) {
   }
 
   const { id, is_active } = await request.json()
-  if (!id || typeof is_active !== 'boolean') {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!id || !uuidRegex.test(id) || typeof is_active !== 'boolean') {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
   }
   if (id === user.id) {
@@ -48,6 +49,6 @@ export async function PATCH(request: Request) {
     .update({ is_active, updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Error al actualizar operador' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

@@ -89,28 +89,37 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1d. Validar productos del carrito
+  // 1d. Validar productos del carrito (batch query)
   type ProductRow = { id: string; name: string; price: number; stock_quantity: number }
   const productsMap: Record<string, ProductRow> = {}
 
-  for (const item of items) {
-    const { data: product, error: prodErr } = await admin
+  if (items.length > 0) {
+    const productIds = items.map(i => i.product_id)
+    const { data: productRows, error: prodErr } = await admin
       .from('commercial_products')
       .select('id, name, price, stock_quantity')
-      .eq('id', item.product_id)
+      .in('id', productIds)
       .eq('is_deleted', false)
-      .single()
 
-    if (prodErr || !product) {
-      return NextResponse.json({ error: `Producto no encontrado: ${item.product_id}` }, { status: 404 })
+    if (prodErr) {
+      return NextResponse.json({ error: 'Error al validar productos' }, { status: 500 })
     }
-    if (product.stock_quantity < item.quantity) {
-      return NextResponse.json(
-        { error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock_quantity}` },
-        { status: 422 }
-      )
+
+    const foundProducts = new Map((productRows ?? []).map(p => [p.id, p]))
+
+    for (const item of items) {
+      const product = foundProducts.get(item.product_id)
+      if (!product) {
+        return NextResponse.json({ error: `Producto no encontrado: ${item.product_id}` }, { status: 404 })
+      }
+      if (product.stock_quantity < item.quantity) {
+        return NextResponse.json(
+          { error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock_quantity}` },
+          { status: 422 }
+        )
+      }
+      productsMap[item.product_id] = product
     }
-    productsMap[item.product_id] = product
   }
 
   // 1e. Leer config de precio por gramo

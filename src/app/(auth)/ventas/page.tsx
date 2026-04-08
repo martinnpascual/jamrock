@@ -71,6 +71,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
     resolver: zodResolver(saleSchema), defaultValues: { quantity: 1 },
   })
   const pid = watch('product_id')
+  const paymentMethod = watch('payment_method')
   const selProd = products.find(p => p.id === pid)
   async function onSubmit(data: SaleFormData) {
     try {
@@ -129,7 +130,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Producto *</Label>
-              <Select onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', p.price) }}>
+              <Select value={pid ?? ''} onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', p.price) }}>
                 <SelectTrigger className={errors.product_id ? 'border-red-400' : ''}><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
                 <SelectContent>{products.filter(p => p.stock_quantity > 0).map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {ARS(p.price)} ({p.stock_quantity} disp.)</SelectItem>)}</SelectContent>
               </Select>
@@ -153,7 +154,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
             </div>
             <div className="space-y-1.5">
               <Label>Método de pago *</Label>
-              <Select onValueChange={v => setValue('payment_method', v as 'efectivo' | 'transferencia' | 'mixto')}>
+              <Select value={paymentMethod ?? ''} onValueChange={v => setValue('payment_method', v as 'efectivo' | 'transferencia' | 'mixto')}>
                 <SelectTrigger className={errors.payment_method ? 'border-red-400' : ''}><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="mixto">Mixto</SelectItem></SelectContent>
               </Select>

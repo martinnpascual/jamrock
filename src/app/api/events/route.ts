@@ -23,6 +23,12 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Solo gerente o secretaria puede crear eventos
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos para crear eventos' }, { status: 403 })
+  }
+
   const body = await req.json()
   const parsed = eventSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })

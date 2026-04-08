@@ -30,10 +30,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (profile?.role !== 'gerente') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
+  // Validar con Zod para evitar inyección de campos arbitrarios
+  const { eventSchema } = await import('@/lib/validations/event')
+  const parsed = eventSchema.partial().safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
+
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('events')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', params.id)
     .select()
     .single()

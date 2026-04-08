@@ -21,6 +21,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  }
+
   const { member_id } = await req.json()
   if (!member_id) return NextResponse.json({ error: 'member_id requerido' }, { status: 400 })
 
@@ -43,6 +48,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  }
+
   const { attendee_id, attended } = await req.json()
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -61,6 +71,11 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || !['gerente', 'secretaria'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  }
 
   const { searchParams } = new URL(req.url)
   const attendeeId = searchParams.get('attendee_id')
