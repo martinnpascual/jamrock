@@ -11,6 +11,10 @@ export const stockLotSchema = z.object({
     .nonnegative()
     .optional()
     .nullable(),
+  price_per_gram: z.coerce
+    .number()
+    .nonnegative('El precio no puede ser negativo')
+    .default(0),
   lot_date: z.string().optional().or(z.literal('')),
   notes: z.string().max(500).optional().or(z.literal('')),
 })

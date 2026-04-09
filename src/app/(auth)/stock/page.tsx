@@ -138,7 +138,8 @@ function LotCard({
               <p className="text-sm font-semibold text-slate-100 truncate">{lot.genetics}</p>
               <p className="text-xs text-slate-400">
                 {new Date(lot.lot_date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                {lot.cost_per_gram ? ` · $${lot.cost_per_gram}/g` : ''}
+                {lot.price_per_gram > 0 ? ` · Venta: $${lot.price_per_gram.toLocaleString('es-AR')}/g` : ' · Sin precio'}
+                {lot.cost_per_gram ? ` · Costo: $${lot.cost_per_gram}/g` : ''}
               </p>
             </div>
           </div>
@@ -279,21 +280,35 @@ function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void })
             {errors.genetics && <p className="text-xs text-red-500">{errors.genetics.message}</p>}
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Gramos iniciales *</Label>
+            <Input
+              type="number"
+              step="0.1"
+              placeholder="500"
+              {...register('initial_grams')}
+              className={errors.initial_grams ? 'border-red-400' : ''}
+            />
+            {errors.initial_grams && <p className="text-xs text-red-500">{errors.initial_grams.message}</p>}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Gramos iniciales *</Label>
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="500"
-                {...register('initial_grams')}
-                className={errors.initial_grams ? 'border-red-400' : ''}
-              />
-              {errors.initial_grams && <p className="text-xs text-red-500">{errors.initial_grams.message}</p>}
-            </div>
             <div className="space-y-1.5">
               <Label>Costo por gramo ($)</Label>
               <Input type="number" step="0.01" placeholder="0.00" {...register('cost_per_gram')} />
+              <p className="text-xs text-slate-500">Lo que pagamos al proveedor</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Precio por gramo ($) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="15000"
+                {...register('price_per_gram')}
+                className={errors.price_per_gram ? 'border-red-400' : ''}
+              />
+              <p className="text-xs text-slate-500">Lo que cobramos al socio</p>
+              {errors.price_per_gram && <p className="text-xs text-red-500">{errors.price_per_gram.message}</p>}
             </div>
           </div>
 

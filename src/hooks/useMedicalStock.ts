@@ -10,6 +10,7 @@ export type MedicalStockLot = {
   initial_grams: number
   current_grams: number
   cost_per_gram: number | null
+  price_per_gram: number
   lot_date: string
   notes: string | null
   created_at: string

@@ -65,6 +65,7 @@ export interface MedicalStockLot {
   initial_grams: number
   current_grams: number
   cost_per_gram: number | null
+  price_per_gram: number
   lot_date: string
   supplier_id: string | null
   notes: string | null

@@ -173,7 +173,12 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
         )}
       </div>
 
-      <span className="text-sm text-slate-400 capitalize">{p.concept.replace('_', ' ')}</span>
+      <div>
+        <span className="text-sm text-slate-400 capitalize">{p.concept.replace('_', ' ')}</span>
+        {p.notes && p.concept === 'dispensa' && (
+          <p className="text-xs text-slate-500 truncate max-w-[200px]" title={p.notes}>{p.notes}</p>
+        )}
+      </div>
 
       <div>
         {p.payment_method && (

@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { genetics, initial_grams, cost_per_gram, lot_date, notes } = parsed.data
+  const { genetics, initial_grams, cost_per_gram, price_per_gram, lot_date, notes } = parsed.data
 
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       initial_grams,
       current_grams: initial_grams, // arranca lleno
       cost_per_gram: cost_per_gram ?? null,
+      price_per_gram: price_per_gram ?? 0,
       lot_date: lot_date || new Date().toISOString().split('T')[0],
       notes: notes || null,
       created_by: user.id,

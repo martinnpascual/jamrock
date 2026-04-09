@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   // 1c. Lote medicinal existe, no eliminado, stock suficiente
   const { data: lot, error: lotErr } = await admin
     .from('medical_stock_lots')
-    .select('id, genetics, current_grams')
+    .select('id, genetics, current_grams, price_per_gram')
     .eq('id', dispInput.lot_id)
     .eq('is_deleted', false)
     .single()
@@ -122,15 +122,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 1e. Leer config de precio por gramo
-  const { data: configRow } = await admin
-    .from('app_config')
-    .select('value')
-    .eq('key', 'dispensation_price_per_gram')
-    .single()
+  // 1e. Precio por gramo: prioridad al precio del lote, fallback a config global
+  const lotPrice = Number(lot.price_per_gram ?? 0)
+  let pricePerGram = lotPrice
 
-  const dispConfig = (configRow?.value as { enabled: boolean; price: number }) ?? { enabled: false, price: 0 }
-  const pricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
+  if (pricePerGram === 0) {
+    const { data: configRow } = await admin
+      .from('app_config')
+      .select('value')
+      .eq('key', 'dispensation_price_per_gram')
+      .single()
+    const dispConfig = (configRow?.value as { enabled: boolean; price: number }) ?? { enabled: false, price: 0 }
+    pricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
+  }
 
   // 1f. Calcular totales con descuento
   const dispensationSubtotal = pricePerGram * dispInput.quantity_grams
@@ -289,7 +293,7 @@ export async function POST(request: NextRequest) {
     const itemsDescription = items.length > 0
       ? ` + Productos: ${items.map(i => `${productsMap[i.product_id].name} ×${i.quantity}`).join(', ')}`
       : ''
-    const debitDescription = `Checkout: ${dispensation.dispensation_number} — ${dispInput.genetics} ×${dispInput.quantity_grams}g${itemsDescription}`
+    const debitDescription = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}${itemsDescription}`
 
     const { data: debitMovement, error: debitErr } = await admin
       .from('current_account_movements')
@@ -319,16 +323,16 @@ export async function POST(request: NextRequest) {
     if (payment.method !== 'cuenta_corriente') {
       changeGiven = Math.max(0, amountCash + amountTransfer - totalAmount)
 
-      const paymentNotes = `Checkout ${dispensation.dispensation_number}` +
+      const paymentNotes = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}` +
         (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
-        (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(2)}` : '')
+        (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(0)}` : '')
 
       const { data: newPayment, error: paymentErr } = await admin
         .from('payments')
         .insert({
           member_id,
           amount:         totalAmount,
-          concept:        'checkout',
+          concept:        'dispensa',
           payment_method: payment.method,
           notes:          paymentNotes,
           created_by:     user.id,

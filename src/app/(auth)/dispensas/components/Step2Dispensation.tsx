@@ -39,7 +39,10 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
 
   const selectedLot  = activeLots.find(l => l.id === lotId)
   const gramsNum     = parseFloat(gramsStr) || 0
-  const pricePerGram = config?.enabled ? config.pricePerGram : 0
+  // Precio viene del lote (per-lot pricing), fallback a config global si el lote no tiene precio
+  const pricePerGram = selectedLot?.price_per_gram
+    ? selectedLot.price_per_gram
+    : (config?.enabled ? config.pricePerGram : 0)
   const subtotal     = pricePerGram * gramsNum
   const activeDiscount = applyDiscount ? discountPercent : 0
   const discountAmount = subtotal * (activeDiscount / 100)
@@ -72,8 +75,11 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
     }
   }
 
+  const formatPrice = (n: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
   const selectedLotLabel = selectedLot
-    ? `${selectedLot.genetics} — ${selectedLot.current_grams}g disponibles`
+    ? `${selectedLot.genetics} — ${selectedLot.current_grams}g disponibles${selectedLot.price_per_gram > 0 ? ` · ${formatPrice(selectedLot.price_per_gram)}/g` : ''}`
     : 'Seleccioná lote...'
 
   return (
@@ -103,7 +109,7 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
             <SelectContent>
               {activeLots.map(l => (
                 <SelectItem key={l.id} value={l.id}>
-                  {l.genetics} — {l.current_grams}g disponibles
+                  {l.genetics} — {l.current_grams}g disponibles{l.price_per_gram > 0 ? ` · ${formatPrice(l.price_per_gram)}/g` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -133,8 +139,8 @@ export function Step2Dispensation({ config, onOnlyDispense, onAddProducts }: Ste
         )}
       </div>
 
-      {/* ── Precio y descuento (solo si config.enabled y gramsNum > 0) ── */}
-      {config?.enabled && gramsNum > 0 && (
+      {/* ── Precio y descuento (si el lote tiene precio o config habilitada) ── */}
+      {pricePerGram > 0 && gramsNum > 0 && (
         <div className="space-y-3 border border-white/[0.08] rounded-xl p-4 bg-white/[0.02]">
           {/* Subtotal */}
           <div className="flex justify-between items-center text-sm">
