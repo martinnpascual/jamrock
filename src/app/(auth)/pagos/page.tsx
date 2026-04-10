@@ -27,6 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { MemberCombobox } from '@/components/ui/member-combobox'
 import { Search, Plus, Loader2, DollarSign, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -234,18 +235,12 @@ function NewPaymentDialog({ open, onClose }: { open: boolean; onClose: () => voi
           {/* Socio */}
           <div className="space-y-1.5">
             <Label>Socio *</Label>
-            <Select onValueChange={(v) => setValue('member_id', v as string)}>
-              <SelectTrigger className={errors.member_id ? 'border-red-400' : ''}>
-                <SelectValue placeholder="Seleccionar socio..." />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.first_name} {m.last_name} · {m.member_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MemberCombobox
+              members={members}
+              value={watch('member_id') || null}
+              onChange={(id) => setValue('member_id', id ?? '')}
+              placeholder="Buscar socio..."
+            />
             {errors.member_id && <p className="text-xs text-red-500">{errors.member_id.message}</p>}
           </div>
 

@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { MemberCombobox } from '@/components/ui/member-combobox'
 import { Loader2, ArrowDownUp } from 'lucide-react'
 
 interface NewAccountModalProps {
@@ -101,19 +102,12 @@ export function NewAccountModal({ open, onClose }: NewAccountModalProps) {
           {entityType === 'socio' && (
             <div className="space-y-1.5">
               <Label>Socio *</Label>
-              <Select value={memberId} onValueChange={(v) => setMemberId(v ?? '')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar socio..." />
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={m.id} label={`${m.first_name} ${m.last_name}`}>
-                      {m.first_name} {m.last_name}
-                      <span className="text-slate-400 ml-2 font-mono text-xs">{m.member_number}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MemberCombobox
+                members={members}
+                value={memberId || null}
+                onChange={(id) => setMemberId(id ?? '')}
+                placeholder="Buscar socio..."
+              />
             </div>
           )}
 
