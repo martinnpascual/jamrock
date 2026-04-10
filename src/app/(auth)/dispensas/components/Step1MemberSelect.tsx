@@ -37,18 +37,7 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
 
     const q = query.trim()
     const { data, error: err } = await supabase
-      .from('members')
-      .select('*')
-      .eq('is_deleted', false)
-      .or(
-        `first_name.ilike.%${q}%,` +
-        `last_name.ilike.%${q}%,` +
-        `dni.eq.${q},` +
-        `member_number.ilike.%${q}%,` +
-        `qr_code.eq.${q}`
-      )
-      .order('first_name')
-      .limit(10)
+      .rpc('search_members', { query: q })
 
     if (err) {
       setError('Error al buscar socios')
