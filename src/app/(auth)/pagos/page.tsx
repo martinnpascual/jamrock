@@ -211,7 +211,7 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
 function NewPaymentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: members = [] } = useMembers()
   const createMutation = useCreatePayment()
-  const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting } } = useForm<PaymentFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
   })
 
