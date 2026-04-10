@@ -156,3 +156,47 @@ export async function PATCH(request: NextRequest) {
   if (error) return NextResponse.json({ error: 'Error al cerrar caja' }, { status: 500 })
   return NextResponse.json({ register: data })
 }
+
+// PUT — reabrir caja cerrada
+export async function PUT(request: NextRequest) {
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || profile.role !== 'gerente') {
+    return NextResponse.json({ error: 'Solo el gerente puede reabrir la caja' }, { status: 403 })
+  }
+
+  let body: { id: string }
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }) }
+
+  if (!body.id) {
+    return NextResponse.json({ error: 'id requerido' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+
+  const { data: register, error: regErr } = await admin.from('cash_registers')
+    .select('*').eq('id', body.id).single()
+
+  if (regErr || !register) {
+    return NextResponse.json({ error: 'Caja no encontrada' }, { status: 404 })
+  }
+
+  if (register.status === 'abierta') {
+    return NextResponse.json({ error: 'La caja ya está abierta' }, { status: 422 })
+  }
+
+  const { data, error } = await admin.from('cash_registers').update({
+    status: 'abierta',
+    actual_total: null,
+    difference: null,
+    notes: null,
+    closed_by: null,
+    closed_at: null,
+  }).eq('id', body.id).select().single()
+
+  if (error) return NextResponse.json({ error: 'Error al reabrir caja' }, { status: 500 })
+  return NextResponse.json({ register: data })
+}

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema, saleSchema, CATEGORIES, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
 import { useProducts, useCreateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
 import { useSales, useCreateSale, useDeleteSale } from '@/hooks/useSales'
-import { useTodayCashRegister, useOpenCashRegister, useCloseCashRegister, type CashRegister } from '@/hooks/useCashRegister'
+import { useTodayCashRegister, useOpenCashRegister, useCloseCashRegister, useReopenCashRegister, type CashRegister } from '@/hooks/useCashRegister'
 import { useMembers } from '@/hooks/useMembers'
 import { useRole } from '@/hooks/useRole'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon } from 'lucide-react'
+import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Tab = 'ventas' | 'productos' | 'caja'
@@ -299,6 +299,7 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
   const { data, isLoading } = useTodayCashRegister()
   const openReg = useOpenCashRegister()
   const closeReg = useCloseCashRegister()
+  const reopenReg = useReopenCashRegister()
 
   // Shift selection for opening
   const autoShift = new Date().getHours() < 14 ? 'mañana' : 'tarde'
@@ -306,6 +307,9 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
 
   // Open confirmation dialog
   const [showOpenConfirm, setShowOpenConfirm] = useState(false)
+
+  // Reopen confirmation dialog
+  const [reopeningReg, setReopeningReg] = useState<{ id: string; shift: string } | null>(null)
 
   // Close dialog state
   const [closingShift, setClosingShift] = useState<'mañana' | 'tarde' | null>(null)
@@ -328,6 +332,17 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
       showToast(`Caja turno ${selectedShift} abierta correctamente`)
     } catch (err) {
       console.error('Error al abrir caja:', err)
+    }
+  }
+
+  async function onReopen() {
+    if (!reopeningReg) return
+    try {
+      await reopenReg.mutateAsync(reopeningReg.id)
+      showToast(`Caja turno ${reopeningReg.shift} reabierta correctamente`)
+      setReopeningReg(null)
+    } catch (err) {
+      console.error('Error al reabrir caja:', err)
     }
   }
 
@@ -392,6 +407,17 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
             >
               <Lock className="w-3.5 h-3.5" />
               Cerrar caja
+            </Button>
+          )}
+          {isClosed && isGerente && (
+            <Button
+              onClick={() => setReopeningReg({ id: reg.id, shift })}
+              variant="outline"
+              className="h-9 gap-1.5 border-amber-600/50 text-amber-400 hover:bg-amber-950/30 font-bold min-h-[44px]"
+              size="sm"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reabrir
             </Button>
           )}
         </div>
@@ -554,6 +580,28 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
               className="bg-green-600 hover:bg-green-700 text-white font-bold min-h-[44px]"
             >
               {openReg.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Abriendo...</> : 'Sí, abrir caja'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog: Confirmar reapertura */}
+      <AlertDialog open={!!reopeningReg} onOpenChange={o => { if (!o) setReopeningReg(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir caja</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés reabrir la caja del turno <strong className="text-slate-200">{reopeningReg?.shift?.toUpperCase()}</strong>? Se borrarán los datos del cierre anterior (monto contado, diferencia y notas).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reopenReg.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onReopen}
+              disabled={reopenReg.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold min-h-[44px]"
+            >
+              {reopenReg.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reabriendo...</> : 'Sí, reabrir caja'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

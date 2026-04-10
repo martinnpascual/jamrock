@@ -76,3 +76,19 @@ export function useCloseCashRegister() {
     onSuccess: () => qc.invalidateQueries({ queryKey: [QK] }),
   })
 }
+
+export function useReopenCashRegister() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/cash-register', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Error')
+      return res.json()
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [QK] }),
+  })
+}
