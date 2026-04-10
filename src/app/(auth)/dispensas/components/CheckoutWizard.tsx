@@ -72,7 +72,8 @@ export function CheckoutWizard() {
 
   const {
     currentStep, member, memberCCBalance, dispensation,
-    cartItems, paymentMethod, amountCash, amountTransfer,
+    cartItems, paymentMethod, amountCash, amountTransfer, amountCC,
+    transferDetail, transferAmountReceived,
     changeGiven, dispensationSubtotal, productsSubtotal, total,
     isProcessing, error, result,
   } = checkout
@@ -130,12 +131,18 @@ export function CheckoutWizard() {
               paymentMethod={paymentMethod}
               amountCash={amountCash}
               amountTransfer={amountTransfer}
+              amountCC={amountCC}
+              transferDetail={transferDetail}
+              transferAmountReceived={transferAmountReceived}
               changeGiven={changeGiven}
               isProcessing={isProcessing}
               error={error}
               onSetPaymentMethod={checkout.setPaymentMethod}
               onSetCash={checkout.setCashAmount}
               onSetTransfer={checkout.setTransferAmount}
+              onSetCC={checkout.setCCAmount}
+              onSetTransferDetail={checkout.setTransferDetail}
+              onSetTransferAmountReceived={checkout.setTransferAmountReceived}
               onConfirm={checkout.processCheckout}
               onBack={() => checkout.goToStep(dispensation && cartItems.length >= 0 ? 3 : 2)}
             />

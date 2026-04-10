@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Leaf, ShoppingBag, CreditCard, Plus } from 'lucide-react'
+import { CheckCircle2, Leaf, ShoppingBag, CreditCard, Banknote, ArrowLeftRight, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CheckoutResult } from '@/hooks/useCheckout'
 import type { Member } from '@/types/database'
@@ -17,6 +17,7 @@ interface Step5Props {
 
 export function Step5Confirmation({ result, member, onReset }: Step5Props) {
   const isPagado = result.payment_status === 'pagado'
+  const isParcial = result.payment_status === 'parcial'
 
   return (
     <div className="space-y-6 py-2">
@@ -84,16 +85,46 @@ export function Step5Confirmation({ result, member, onReset }: Step5Props) {
             'text-xs font-semibold px-2.5 py-1 rounded-full',
             isPagado
               ? 'bg-[#2DC814]/10 text-[#2DC814] border border-[#2DC814]/20'
-              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              : isParcial
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
           )}>
-            {isPagado ? 'Pagado' : 'Fiado'}
+            {isPagado ? 'Pagado' : isParcial ? 'Pago parcial' : 'Fiado'}
           </span>
         </div>
 
-        {result.amount_paid > 0 && (
+        {/* Desglose de pago (efectivo / transferencia / CC) */}
+        {(result.amount_cash > 0 || result.amount_transfer > 0) && (
+          <>
+            {result.amount_cash > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Banknote className="w-3.5 h-3.5" />
+                  Efectivo
+                </div>
+                <p className="text-xs font-semibold text-slate-300">{ARS(result.amount_cash)}</p>
+              </div>
+            )}
+
+            {result.amount_transfer > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  Transferencia
+                  {result.transfer_detail && (
+                    <span className="text-slate-600 truncate max-w-[120px]">({result.transfer_detail})</span>
+                  )}
+                </div>
+                <p className="text-xs font-semibold text-slate-300">{ARS(result.amount_transfer)}</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {result.amount_charged_to_cc > 0 && (
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
-            <p className="text-xs text-slate-500">Recibido</p>
-            <p className="text-xs text-slate-400">{ARS(result.amount_paid)}</p>
+            <p className="text-xs text-slate-500">Cargado a CC</p>
+            <p className="text-xs font-semibold text-amber-400">{ARS(result.amount_charged_to_cc)}</p>
           </div>
         )}
 
@@ -101,13 +132,6 @@ export function Step5Confirmation({ result, member, onReset }: Step5Props) {
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
             <p className="text-xs text-slate-500">Vuelto entregado</p>
             <p className="text-xs font-semibold text-[#2DC814]">{ARS(result.change_given)}</p>
-          </div>
-        )}
-
-        {result.amount_charged_to_cc > 0 && (
-          <div className="flex items-center justify-between px-4 py-2.5 gap-2">
-            <p className="text-xs text-slate-500">Cargado a CC</p>
-            <p className="text-xs font-semibold text-amber-400">{ARS(result.amount_charged_to_cc)}</p>
           </div>
         )}
 
@@ -127,7 +151,7 @@ export function Step5Confirmation({ result, member, onReset }: Step5Props) {
       {/* Botón nueva dispensa */}
       <Button
         onClick={onReset}
-        className="w-full h-12 gap-2 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold"
+        className="w-full h-12 gap-2 bg-[#2DC814] hover:bg-[#25a811] text-black font-bold min-h-[44px]"
       >
         <Plus className="w-4 h-4" />
         Nueva dispensa

@@ -28,43 +28,53 @@ export interface CheckoutResult {
   total_amount:         number
   dispensation_amount:  number
   products_amount:      number
-  payment_status:       'pagado' | 'fiado'
+  payment_status:       'pagado' | 'fiado' | 'parcial'
+  payment_method:       string | null
   amount_paid:          number
+  amount_cash:          number
+  amount_transfer:      number
   amount_charged_to_cc: number
   change_given:         number
+  transfer_detail:      string | null
   cc_balance:           number
 }
 
-export type PaymentMethod = 'efectivo' | 'transferencia' | 'mixto' | 'cuenta_corriente'
+export type PaymentMethod = 'efectivo' | 'transferencia' | 'mixto' | 'mixto_3' | 'cuenta_corriente'
 
 export interface CheckoutState {
-  currentStep:         1 | 2 | 3 | 4 | 5
-  member:              Member | null
-  memberCCBalance:     number
-  dispensation:        DispensationInput | null
-  cartItems:           CartItem[]
-  paymentMethod:       PaymentMethod | null
-  amountCash:          number
-  amountTransfer:      number
-  result:              CheckoutResult | null
-  isProcessing:        boolean
-  error:               string | null
+  currentStep:            1 | 2 | 3 | 4 | 5
+  member:                 Member | null
+  memberCCBalance:        number
+  dispensation:           DispensationInput | null
+  cartItems:              CartItem[]
+  paymentMethod:          PaymentMethod | null
+  amountCash:             number
+  amountTransfer:         number
+  amountCC:               number
+  transferDetail:         string
+  transferAmountReceived: number
+  result:                 CheckoutResult | null
+  isProcessing:           boolean
+  error:                  string | null
 }
 
 // ── Initial State ─────────────────────────────────────────────────────────────
 
 const initialState: CheckoutState = {
-  currentStep:     1,
-  member:          null,
-  memberCCBalance: 0,
-  dispensation:    null,
-  cartItems:       [],
-  paymentMethod:   null,
-  amountCash:      0,
-  amountTransfer:  0,
-  result:          null,
-  isProcessing:    false,
-  error:           null,
+  currentStep:            1,
+  member:                 null,
+  memberCCBalance:        0,
+  dispensation:           null,
+  cartItems:              [],
+  paymentMethod:          null,
+  amountCash:             0,
+  amountTransfer:         0,
+  amountCC:               0,
+  transferDetail:         '',
+  transferAmountReceived: 0,
+  result:                 null,
+  isProcessing:           false,
+  error:                  null,
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -73,7 +83,6 @@ export function useCheckout() {
   const [state, setState] = useState<CheckoutState>(initialState)
 
   // ── Totales calculados ────────────────────────────────────────────────────
-  // cost = subtotal bruto; discountPercent reduce el monto final de la dispensa
   const dispensationSubtotal = useMemo(() => {
     if (!state.dispensation) return 0
     const { cost, discountPercent } = state.dispensation
@@ -88,10 +97,18 @@ export function useCheckout() {
   const total = dispensationSubtotal + productsSubtotal
 
   const changeGiven = useMemo(() => {
-    if (state.paymentMethod !== 'efectivo' && state.paymentMethod !== 'mixto') return 0
-    const paid = state.amountCash + state.amountTransfer
-    return Math.max(0, paid - total)
-  }, [state.paymentMethod, state.amountCash, state.amountTransfer, total])
+    if (state.paymentMethod === 'efectivo') {
+      return Math.max(0, state.amountCash - total)
+    }
+    if (state.paymentMethod === 'mixto') {
+      return Math.max(0, state.amountCash + state.amountTransfer - total)
+    }
+    if (state.paymentMethod === 'mixto_3') {
+      const partePagada = total - state.amountCC
+      return Math.max(0, state.amountCash + state.amountTransfer - partePagada)
+    }
+    return 0
+  }, [state.paymentMethod, state.amountCash, state.amountTransfer, state.amountCC, total])
 
   // ── Setters ───────────────────────────────────────────────────────────────
 
@@ -147,7 +164,15 @@ export function useCheckout() {
   }, [])
 
   const setPaymentMethod = useCallback((method: PaymentMethod | null) => {
-    setState(s => ({ ...s, paymentMethod: method, amountCash: 0, amountTransfer: 0 }))
+    setState(s => ({
+      ...s,
+      paymentMethod: method,
+      amountCash: 0,
+      amountTransfer: 0,
+      amountCC: 0,
+      transferDetail: '',
+      transferAmountReceived: 0,
+    }))
   }, [])
 
   const setCashAmount = useCallback((amount: number) => {
@@ -156,6 +181,18 @@ export function useCheckout() {
 
   const setTransferAmount = useCallback((amount: number) => {
     setState(s => ({ ...s, amountTransfer: amount }))
+  }, [])
+
+  const setCCAmount = useCallback((amount: number) => {
+    setState(s => ({ ...s, amountCC: amount }))
+  }, [])
+
+  const setTransferDetail = useCallback((detail: string) => {
+    setState(s => ({ ...s, transferDetail: detail }))
+  }, [])
+
+  const setTransferAmountReceived = useCallback((amount: number) => {
+    setState(s => ({ ...s, transferAmountReceived: amount }))
   }, [])
 
   // ── processCheckout ───────────────────────────────────────────────────────
@@ -230,6 +267,9 @@ export function useCheckout() {
     setPaymentMethod,
     setCashAmount,
     setTransferAmount,
+    setCCAmount,
+    setTransferDetail,
+    setTransferAmountReceived,
     processCheckout,
     reset,
   }
@@ -238,14 +278,24 @@ export function useCheckout() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildPaymentPayload(state: CheckoutState) {
-  const { paymentMethod, amountCash, amountTransfer } = state
+  const { paymentMethod, amountCash, amountTransfer, amountCC, transferDetail, transferAmountReceived } = state
+
+  const transferFields = (amountTransfer > 0 || transferDetail)
+    ? {
+      ...(transferDetail ? { transfer_detail: transferDetail } : {}),
+      ...(transferAmountReceived > 0 ? { transfer_amount_received: transferAmountReceived } : {}),
+    }
+    : {}
+
   switch (paymentMethod) {
     case 'efectivo':
       return { method: 'efectivo', amount_cash: amountCash, amount_transfer: 0 }
     case 'transferencia':
-      return { method: 'transferencia', amount_cash: 0, amount_transfer: amountTransfer }
+      return { method: 'transferencia', amount_cash: 0, amount_transfer: amountTransfer, ...transferFields }
     case 'mixto':
-      return { method: 'mixto', amount_cash: amountCash, amount_transfer: amountTransfer }
+      return { method: 'mixto', amount_cash: amountCash, amount_transfer: amountTransfer, ...transferFields }
+    case 'mixto_3':
+      return { method: 'mixto_3', amount_cash: amountCash, amount_transfer: amountTransfer, amount_cc: amountCC, ...transferFields }
     case 'cuenta_corriente':
       return { method: 'cuenta_corriente' }
     default:

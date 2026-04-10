@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar } from 'lucide-react'
+import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock'
+type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 function useDateRange(from: string, to: string) {
@@ -19,10 +19,10 @@ function useDateRange(from: string, to: string) {
   }
 }
 
-function useReportData(type: ReportType, from: string, to: string) {
+function useReportData(type: ReportType, from: string, to: string, shiftFilter: string, onlyDiff: boolean) {
   const range = useDateRange(from, to)
   return useQuery({
-    queryKey: ['report', type, from, to],
+    queryKey: ['report', type, from, to, shiftFilter, onlyDiff],
     queryFn: async () => {
       const supabase = createClient()
       if (type === 'dispensas') {
@@ -67,6 +67,29 @@ function useReportData(type: ReportType, from: string, to: string) {
           .limit(200)
         return data ?? []
       }
+      if (type === 'caja') {
+        let query = supabase
+          .from('cash_registers')
+          .select('id, register_date, shift, expected_total, actual_total, difference, status, closed_by, closed_at, notes, profiles!cash_registers_closed_by_fkey(full_name)')
+          .eq('status', 'cerrada')
+          .gte('register_date', from)
+          .lte('register_date', to)
+          .order('register_date', { ascending: false })
+
+        if (shiftFilter !== 'todos') {
+          query = query.eq('shift', shiftFilter)
+        }
+
+        const { data } = await query.limit(500)
+        let rows = data ?? []
+
+        // Filter only with difference client-side (simpler than DB filter for non-zero)
+        if (onlyDiff) {
+          rows = rows.filter(r => r.difference !== null && r.difference !== 0)
+        }
+
+        return rows
+      }
       return []
     },
   })
@@ -91,13 +114,18 @@ export default function ReportesPage() {
   const firstOfMonth = today.slice(0, 8) + '01'
   const [from, setFrom] = useState(firstOfMonth)
   const [to, setTo] = useState(today)
-  const { data, isLoading } = useReportData(type, from, to)
+  // Caja filters
+  const [shiftFilter, setShiftFilter] = useState<string>('todos')
+  const [onlyDiff, setOnlyDiff] = useState(false)
+
+  const { data, isLoading } = useReportData(type, from, to, shiftFilter, onlyDiff)
 
   const REPORTS: { id: ReportType; label: string; Icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
     { id: 'dispensas', label: 'Dispensas', Icon: Syringe, desc: 'Historial completo de entregas' },
     { id: 'socios', label: 'Socios', Icon: Users, desc: 'Padrón general de miembros' },
     { id: 'financiero', label: 'Financiero', Icon: DollarSign, desc: 'Ventas y pagos del período' },
     { id: 'stock', label: 'Stock medicinal', Icon: Package, desc: 'Estado actual de lotes' },
+    { id: 'caja', label: 'Cierre de caja', Icon: Lock, desc: 'Cierres por turno y fecha' },
   ]
 
   function handleExport() {
@@ -142,6 +170,43 @@ export default function ReportesPage() {
         ['Genética', 'Gramos iniciales', 'Gramos actuales', 'Gramos dispensados', 'Costo/g', 'Fecha lote'])
       downloadCSV(csv, `stock_${stamp}.csv`)
     }
+
+    if (type === 'caja') {
+      const rows = data as unknown as CajaRow[]
+      const csvRows = rows.map(d => {
+        const p = Array.isArray(d.profiles) ? (d.profiles as unknown[])[0] as { full_name: string } | null : d.profiles as { full_name: string } | null
+        return [
+          new Date(d.register_date + 'T12:00:00').toLocaleDateString('es-AR'),
+          d.shift === 'mañana' ? 'Mañana' : 'Tarde',
+          String(d.expected_total ?? 0),
+          String(d.actual_total ?? 0),
+          String(d.difference ?? 0),
+          p?.full_name ?? '—',
+          d.closed_at ? new Date(d.closed_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '—',
+          d.notes ?? '',
+        ]
+      })
+      // Add totals row
+      const totExpected = rows.reduce((s, r) => s + Number(r.expected_total ?? 0), 0)
+      const totActual = rows.reduce((s, r) => s + Number(r.actual_total ?? 0), 0)
+      const totDiff = rows.reduce((s, r) => s + Number(r.difference ?? 0), 0)
+      csvRows.push(['TOTALES', '', String(totExpected), String(totActual), String(totDiff), '', '', ''])
+
+      const csv = toCSV(csvRows, ['Fecha', 'Turno', 'Esperado ($)', 'Contado ($)', 'Diferencia ($)', 'Cerrado por', 'Hora cierre', 'Notas'])
+      downloadCSV(csv, `cierre_caja_${stamp}.csv`)
+    }
+  }
+
+  // Show date range for these report types
+  const showDateRange = ['dispensas', 'financiero', 'caja'].includes(type)
+
+  function getRecordCount(): string {
+    if (!data) return '0 registros'
+    if (type === 'financiero') {
+      const fd = data as { sales: unknown[]; payments: unknown[] }
+      return `${fd.sales.length + fd.payments.length} registros`
+    }
+    return `${(data as unknown[]).length} registros`
   }
 
   return (
@@ -158,7 +223,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Selector de reporte */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {REPORTS.map(({ id, label, Icon, desc }) => (
           <button
             key={id}
@@ -178,8 +243,8 @@ export default function ReportesPage() {
         ))}
       </div>
 
-      {/* Rango de fechas (solo los que lo usan) */}
-      {(type === 'dispensas' || type === 'financiero') && (
+      {/* Rango de fechas */}
+      {showDateRange && (
         <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3 border border-white/[0.06]">
           <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <div className="flex items-center gap-2 flex-wrap">
@@ -190,6 +255,38 @@ export default function ReportesPage() {
             <input type="date" value={to} onChange={e => setTo(e.target.value)}
               className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
           </div>
+        </div>
+      )}
+
+      {/* Filtros de caja */}
+      {type === 'caja' && (
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Turno:</span>
+            {['todos', 'mañana', 'tarde'].map(s => (
+              <button
+                key={s}
+                onClick={() => setShiftFilter(s)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                  shiftFilter === s
+                    ? 'bg-[#2DC814]/10 border-[#2DC814]/30 text-[#2DC814]'
+                    : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'
+                )}
+              >
+                {s === 'todos' ? 'Todos' : s === 'mañana' ? 'Mañana' : 'Tarde'}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={onlyDiff}
+              onChange={e => setOnlyDiff(e.target.checked)}
+              className="rounded border-white/20 bg-white/5 text-[#2DC814] focus:ring-[#2DC814]/50"
+            />
+            <span className="text-xs text-slate-400">Solo con diferencia</span>
+          </label>
         </div>
       )}
 
@@ -204,9 +301,7 @@ export default function ReportesPage() {
           </div>
           {!isLoading && data && (
             <Badge variant="outline" className="text-xs text-slate-500">
-              {type === 'financiero'
-                ? `${(data as { sales: unknown[]; payments: unknown[] }).sales.length + (data as { sales: unknown[]; payments: unknown[] }).payments.length} registros`
-                : `${(data as unknown[]).length} registros`}
+              {getRecordCount()}
             </Badge>
           )}
         </div>
@@ -219,6 +314,7 @@ export default function ReportesPage() {
             {type === 'socios' && <SociosTable data={data as unknown as SocioRow[]} />}
             {type === 'financiero' && <FinancieroTable data={data as unknown as FinancieroData} />}
             {type === 'stock' && <StockTable data={data as unknown as StockRow[]} />}
+            {type === 'caja' && <CajaTable data={data as unknown as CajaRow[]} />}
           </div>
         )}
       </div>
@@ -231,6 +327,7 @@ type DispensaRow = { dispensation_number: string; quantity_grams: number; geneti
 type SocioRow = { member_number: string; first_name: string; last_name: string; reprocann_status: string; member_type: string; created_at: string }
 type FinancieroData = { sales: { total: number; payment_method: string | null; created_at: string; commercial_products: { name: string } | null }[]; payments: { amount: number; concept: string; payment_method: string | null; created_at: string; members: { first_name: string; last_name: string } | null }[] }
 type StockRow = { genetics: string; initial_grams: number; current_grams: number; cost_per_gram: number | null; lot_date: string }
+type CajaRow = { id: string; register_date: string; shift: string; expected_total: number; actual_total: number | null; difference: number | null; status: string; closed_by: string | null; closed_at: string | null; notes: string | null; profiles: { full_name: string } | null }
 
 const TH = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <th className={cn('px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-white/[0.02]', className)}>{children}</th>
@@ -394,6 +491,89 @@ function StockTable({ data }: { data: StockRow[] }) {
             )
           })}
         </tbody>
+      </table>
+    </>
+  )
+}
+
+function CajaTable({ data }: { data: CajaRow[] }) {
+  if (!data.length) return <EmptyReport />
+
+  const totExpected = data.reduce((s, r) => s + Number(r.expected_total ?? 0), 0)
+  const totActual = data.reduce((s, r) => s + Number(r.actual_total ?? 0), 0)
+  const totDiff = data.reduce((s, r) => s + Number(r.difference ?? 0), 0)
+
+  return (
+    <>
+      <div className="px-5 py-3 bg-[#2DC814]/5 border-b border-[#2DC814]/10 text-sm text-[#2DC814] flex gap-6 flex-wrap">
+        <span>Cierres: <strong>{data.length}</strong></span>
+        <span>Total esperado: <strong>{ARS(totExpected)}</strong></span>
+        <span>Total contado: <strong>{ARS(totActual)}</strong></span>
+        <span className={cn('font-bold', totDiff === 0 ? '' : totDiff > 0 ? 'text-sky-400' : 'text-red-400')}>
+          Diferencia: {totDiff >= 0 ? '+' : ''}{ARS(totDiff)}
+        </span>
+      </div>
+      <table className="w-full">
+        <thead>
+          <tr>
+            <TH>Fecha</TH>
+            <TH>Turno</TH>
+            <TH>Esperado</TH>
+            <TH>Contado</TH>
+            <TH>Diferencia</TH>
+            <TH>Cerrado por</TH>
+            <TH>Hora cierre</TH>
+            <TH>Notas</TH>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(d => {
+            const prof = Array.isArray(d.profiles) ? (d.profiles as unknown[])[0] as typeof d.profiles : d.profiles
+            const diff = d.difference ?? 0
+            return (
+              <tr key={d.id} className="hover:bg-white/[0.02]">
+                <TD>{new Date(d.register_date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TD>
+                <TD>
+                  <Badge variant="outline" className={cn('text-xs capitalize',
+                    d.shift === 'mañana' ? 'text-amber-400 border-amber-500/20' : 'text-blue-400 border-blue-500/20'
+                  )}>
+                    {d.shift === 'mañana' ? 'Mañana' : 'Tarde'}
+                  </Badge>
+                </TD>
+                <TD className="font-medium">{ARS(Number(d.expected_total ?? 0))}</TD>
+                <TD className="font-medium">{ARS(Number(d.actual_total ?? 0))}</TD>
+                <TD>
+                  <span className={cn('font-semibold',
+                    diff === 0 ? 'text-[#2DC814]' : diff > 0 ? 'text-sky-400' : 'text-red-400'
+                  )}>
+                    {diff >= 0 ? '+' : ''}{ARS(diff)}
+                  </span>
+                </TD>
+                <TD className="text-slate-400">{prof?.full_name ?? '—'}</TD>
+                <TD className="text-slate-400">
+                  {d.closed_at ? new Date(d.closed_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </TD>
+                <TD className="text-slate-400 max-w-[150px] truncate">{d.notes ?? '—'}</TD>
+              </tr>
+            )
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-white/[0.03]">
+            <TD className="font-bold text-slate-200">TOTALES</TD>
+            <TD>{' '}</TD>
+            <TD className="font-bold text-slate-200">{ARS(totExpected)}</TD>
+            <TD className="font-bold text-slate-200">{ARS(totActual)}</TD>
+            <TD>
+              <span className={cn('font-bold', totDiff === 0 ? 'text-[#2DC814]' : totDiff > 0 ? 'text-sky-400' : 'text-red-400')}>
+                {totDiff >= 0 ? '+' : ''}{ARS(totDiff)}
+              </span>
+            </TD>
+            <TD>{' '}</TD>
+            <TD>{' '}</TD>
+            <TD>{' '}</TD>
+          </tr>
+        </tfoot>
       </table>
     </>
   )

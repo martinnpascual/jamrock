@@ -8,8 +8,9 @@
  *   Las sales se crean SIN member_id para evitar que sale_to_cc_movement
  *   genere DÉBITO duplicado. La asociación socio↔venta vive en checkout_items.
  *   CC se maneja exclusivamente aquí:
- *     PAGO:  DÉBITO manual (total) + CRÉDITO via payment trigger → neto 0
- *     FIADO: DÉBITO manual (total) → queda como deuda
+ *     PAGO:     DÉBITO manual (total) + CRÉDITO via payment trigger → neto 0
+ *     FIADO:    DÉBITO manual (total) → queda como deuda
+ *     MIXTO_3:  DÉBITO manual (total) + CRÉDITO via payment (parte pagada) + DÉBITO fiado (parte CC)
  *     GRATIS (total=0): sin movimiento CC
  */
 
@@ -138,7 +139,6 @@ export async function POST(request: NextRequest) {
 
   // 1f. Calcular totales con descuento
   const dispensationSubtotal = pricePerGram * dispInput.quantity_grams
-  // Validar que el descuento enviado por el frontend sea uno de los valores permitidos
   const allowedDiscounts = [0, 5, 10, 15, 20, 25]
   const discountPercent  = allowedDiscounts.includes(dispInput.discount_percent ?? 0)
     ? (dispInput.discount_percent ?? 0)
@@ -151,11 +151,38 @@ export async function POST(request: NextRequest) {
   }, 0)
   const totalAmount = dispensationAmount + productsAmount
 
-  // 1g+h. Validar montos de pago
+  // 1g. Extraer montos de pago según método
   const amountCash     = Number(payment.method !== 'cuenta_corriente' ? (payment.amount_cash ?? 0) : 0)
   const amountTransfer = Number(payment.method !== 'cuenta_corriente' ? (payment.amount_transfer ?? 0) : 0)
+  const amountCC       = payment.method === 'mixto_3' ? Number((payment as { amount_cc?: number }).amount_cc ?? 0) : 0
+  const transferDetail = 'transfer_detail' in payment ? (payment.transfer_detail ?? null) : null
+  const transferAmountReceived = 'transfer_amount_received' in payment ? Number(payment.transfer_amount_received ?? 0) : 0
 
-  if (payment.method !== 'cuenta_corriente' && totalAmount > 0) {
+  // 1h. Validar montos de pago
+  if (payment.method === 'mixto_3' && totalAmount > 0) {
+    // mixto_3: los 3 montos deben cubrir el total
+    if (amountCash + amountTransfer + amountCC < totalAmount) {
+      return NextResponse.json(
+        { error: `Monto insuficiente. Total: $${totalAmount}, Cubierto: $${amountCash + amountTransfer + amountCC}` },
+        { status: 422 }
+      )
+    }
+    // Al menos 2 de los 3 montos deben ser > 0
+    const nonZeroCount = [amountCash, amountTransfer, amountCC].filter(v => v > 0).length
+    if (nonZeroCount < 2) {
+      return NextResponse.json(
+        { error: 'El pago mixto de 3 vías requiere al menos 2 montos mayores a 0' },
+        { status: 422 }
+      )
+    }
+    // transfer_amount_received >= amount_transfer si fue provisto
+    if (amountTransfer > 0 && transferAmountReceived > 0 && transferAmountReceived < amountTransfer) {
+      return NextResponse.json(
+        { error: 'El monto depositado por transferencia no puede ser menor al monto asignado' },
+        { status: 422 }
+      )
+    }
+  } else if (payment.method !== 'cuenta_corriente' && totalAmount > 0) {
     if (amountCash + amountTransfer < totalAmount) {
       return NextResponse.json(
         { error: `Monto insuficiente. Total: $${totalAmount}, Recibido: $${amountCash + amountTransfer}` },
@@ -164,8 +191,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (payment.method === 'cuenta_corriente') {
-    // Verificar credit_limit si está configurado
+  // Validar transfer_amount_received para transferencia y mixto también
+  if ((payment.method === 'transferencia' || payment.method === 'mixto') && amountTransfer > 0 && transferAmountReceived > 0 && transferAmountReceived < amountTransfer) {
+    return NextResponse.json(
+      { error: 'El monto depositado por transferencia no puede ser menor al monto asignado' },
+      { status: 422 }
+    )
+  }
+
+  // 1i. Validar CC si hay monto fiado (mixto_3 con CC o cuenta_corriente puro)
+  if (payment.method === 'cuenta_corriente' || (payment.method === 'mixto_3' && amountCC > 0)) {
+    const ccAmount = payment.method === 'cuenta_corriente' ? totalAmount : amountCC
     const { data: ccAccount } = await admin
       .from('current_accounts')
       .select('balance, credit_limit')
@@ -174,7 +210,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (ccAccount && ccAccount.credit_limit > 0) {
-      const newBalance = ccAccount.balance - totalAmount
+      const newBalance = ccAccount.balance - ccAmount
       if (newBalance < -ccAccount.credit_limit) {
         return NextResponse.json(
           { error: `La deuda excede el límite de crédito ($${ccAccount.credit_limit})` },
@@ -185,9 +221,13 @@ export async function POST(request: NextRequest) {
   }
 
   // ── PASO 2: CREAR DISPENSA ────────────────────────────────────────────────
-  const isFiadoForDisp  = payment.method === 'cuenta_corriente'
-  const paymentStatusForDisp: 'sin_cargo' | 'pagado' | 'fiado' =
-    totalAmount === 0 ? 'sin_cargo' : isFiadoForDisp ? 'fiado' : 'pagado'
+  const isFiado = payment.method === 'cuenta_corriente'
+  const isMixto3 = payment.method === 'mixto_3'
+  const paymentStatusForDisp: 'sin_cargo' | 'pagado' | 'fiado' | 'parcial' =
+    totalAmount === 0 ? 'sin_cargo'
+    : isFiado ? 'fiado'
+    : (isMixto3 && amountCC > 0) ? 'parcial'
+    : 'pagado'
 
   const { data: dispensation, error: dispErr } = await admin
     .from('dispensations')
@@ -199,13 +239,12 @@ export async function POST(request: NextRequest) {
       notes:            dispInput.notes ?? null,
       type:             'normal',
       created_by:       user.id,
-      // Campos de precio (nuevos)
       price_per_gram:   pricePerGram,
       subtotal:         dispensationSubtotal,
       discount_percent: discountPercent,
       discount_amount:  discountAmount,
       total_amount:     dispensationAmount,
-      payment_method:   totalAmount === 0 ? null : (isFiadoForDisp ? 'cuenta_corriente' : payment.method),
+      payment_method:   totalAmount === 0 ? null : (isFiado ? 'cuenta_corriente' : payment.method),
       payment_status:   paymentStatusForDisp,
     })
     .select('id, dispensation_number')
@@ -216,7 +255,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error al registrar dispensa' }, { status: 500 })
   }
 
-  // A partir de aquí, si algo falla intentamos anular la dispensa como rollback
   const rollbackDispensation = async () => {
     await admin.from('dispensations').insert({
       member_id,
@@ -231,7 +269,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── PASO 3: CREAR VENTAS (sin member_id para evitar doble CC) ─────────────
-  const saleIds: Record<string, string> = {} // product_id → sale_id
+  const saleIds: Record<string, string> = {}
 
   for (const item of items) {
     const product = productsMap[item.product_id]
@@ -239,11 +277,11 @@ export async function POST(request: NextRequest) {
       .from('sales')
       .insert({
         product_id:     item.product_id,
-        member_id:      null,                 // ← intencional: CC manejado por checkout
+        member_id:      null,
         quantity:       item.quantity,
         unit_price:     product.price,
         total:          product.price * item.quantity,
-        payment_method: payment.method === 'cuenta_corriente' ? null : payment.method,
+        payment_method: isFiado ? null : payment.method === 'mixto_3' ? 'mixto_3' : payment.method,
         created_by:     user.id,
       })
       .select('id')
@@ -260,6 +298,7 @@ export async function POST(request: NextRequest) {
   // ── PASO 4: CC y PAGO ─────────────────────────────────────────────────────
   let paymentId: string | null = null
   let ccMovementId: string | null = null
+  let ccFiadoMovementId: string | null = null
   let changeGiven = 0
   let ccBalanceAfter = 0
 
@@ -301,8 +340,8 @@ export async function POST(request: NextRequest) {
         account_id:    accountId,
         movement_type: 'debito',
         amount:        totalAmount,
-        balance_after: 0,            // calculado por trigger calc_balance_before_movement
-        concept:       payment.method === 'cuenta_corriente' ? 'checkout_fiado' : 'checkout_deuda',
+        balance_after: 0,
+        concept:       isFiado ? 'checkout_fiado' : 'checkout_deuda',
         description:   debitDescription,
         source_type:   'manual',
         source_id:     null,
@@ -319,60 +358,63 @@ export async function POST(request: NextRequest) {
     ccMovementId   = debitMovement.id
     ccBalanceAfter = debitMovement.balance_after
 
-    // 4b. PAGO (solo si no es fiado)
-    if (payment.method !== 'cuenta_corriente') {
-      changeGiven = Math.max(0, amountCash + amountTransfer - totalAmount)
+    // 4b. PAGO (si no es fiado puro)
+    if (!isFiado) {
+      // Para mixto_3: la parte pagada es cash + transfer (sin CC)
+      const paidAmount = isMixto3 ? (amountCash + amountTransfer) : totalAmount
+      changeGiven = isMixto3
+        ? Math.max(0, (amountCash + amountTransfer) - (totalAmount - amountCC))
+        : Math.max(0, amountCash + amountTransfer - totalAmount)
 
-      const paymentNotes = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}` +
-        (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
-        (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(0)}` : '')
+      if (paidAmount > 0) {
+        const paymentNotes = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}` +
+          (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
+          (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(0)}` : '') +
+          (isMixto3 && amountCC > 0 ? ` — Fiado parcial: $${amountCC}` : '') +
+          (transferDetail ? ` — Transf. detalle: ${transferDetail}` : '')
 
-      const { data: newPayment, error: paymentErr } = await admin
-        .from('payments')
-        .insert({
-          member_id,
-          amount:         totalAmount,
-          concept:        'dispensa',
-          payment_method: payment.method,
-          notes:          paymentNotes,
-          created_by:     user.id,
-        })
-        .select('id')
-        .single()
+        const { data: newPayment, error: paymentErr } = await admin
+          .from('payments')
+          .insert({
+            member_id,
+            amount:         paidAmount,
+            concept:        'dispensa',
+            payment_method: payment.method,
+            notes:          paymentNotes,
+            created_by:     user.id,
+          })
+          .select('id')
+          .single()
 
-      if (paymentErr || !newPayment) {
-        console.error('checkout: error creating payment:', paymentErr?.code)
-        await rollbackDispensation()
-        return NextResponse.json({ error: 'Error al registrar pago' }, { status: 500 })
+        if (paymentErr || !newPayment) {
+          console.error('checkout: error creating payment:', paymentErr?.code)
+          await rollbackDispensation()
+          return NextResponse.json({ error: 'Error al registrar pago' }, { status: 500 })
+        }
+        paymentId = newPayment.id
       }
-      paymentId = newPayment.id
 
-      // 4c. Sumar efectivo a caja del día
+      // 4c. Sumar efectivo a caja abierta del día
       if (amountCash > 0) {
         const today = new Date().toISOString().split('T')[0]
 
-        // Buscar o crear caja del día
-        const { data: existingReg } = await admin
+        // Buscar caja ABIERTA del día (la más reciente si hay 2 turnos)
+        const { data: openReg } = await admin
           .from('cash_registers')
           .select('id, expected_total')
           .eq('register_date', today)
+          .eq('status', 'abierta')
+          .order('created_at', { ascending: false })
+          .limit(1)
           .single()
 
-        if (existingReg) {
+        if (openReg) {
           await admin
             .from('cash_registers')
-            .update({ expected_total: Number(existingReg.expected_total) + amountCash })
-            .eq('id', existingReg.id)
-        } else {
-          await admin
-            .from('cash_registers')
-            .insert({
-              register_date:  today,
-              expected_total: amountCash,
-              status:         'abierta',
-              created_by:     user.id,
-            })
+            .update({ expected_total: Number(openReg.expected_total) + amountCash })
+            .eq('id', openReg.id)
         }
+        // Si no hay caja abierta, el pago se registra igual pero no se suma a ninguna caja
       }
 
       // Actualizar balance after del débito (ahora que el payment trigger ya corrió)
@@ -383,31 +425,66 @@ export async function POST(request: NextRequest) {
         .single()
       if (updatedCC) ccBalanceAfter = updatedCC.balance
     }
+
+    // 4d. Si es mixto_3 con CC > 0: crear movimiento DÉBITO adicional por la parte fiada
+    if (isMixto3 && amountCC > 0) {
+      const cashDesc = amountCash > 0 ? `$${amountCash} efectivo` : ''
+      const transDesc = amountTransfer > 0 ? `$${amountTransfer} transferencia` : ''
+      const paidParts = [cashDesc, transDesc].filter(Boolean).join(' + ')
+
+      const { data: fiadoMov, error: fiadoErr } = await admin
+        .from('current_account_movements')
+        .insert({
+          account_id:    accountId,
+          movement_type: 'debito',
+          amount:        amountCC,
+          balance_after: 0,
+          concept:       'checkout_fiado_parcial',
+          description:   `Pago parcial fiado — $${amountCC} de $${totalAmount} total. Pagó ${paidParts}`,
+          source_type:   'manual',
+          source_id:     null,
+          created_by:    user.id,
+        })
+        .select('id, balance_after')
+        .single()
+
+      if (fiadoErr || !fiadoMov) {
+        console.error('checkout: error creating fiado parcial movement:', fiadoErr?.message)
+      } else {
+        ccFiadoMovementId = fiadoMov.id
+        ccBalanceAfter = fiadoMov.balance_after
+      }
+    }
   }
 
   // ── PASO 5: CREAR checkout_transaction ────────────────────────────────────
-  const isFiado  = isFiadoForDisp
-  const isFree   = totalAmount === 0
+  const isFree = totalAmount === 0
+  const paymentStatus = isFree ? 'pagado'
+    : isFiado ? 'fiado'
+    : (isMixto3 && amountCC > 0) ? 'parcial'
+    : 'pagado'
 
   const { data: transaction, error: txnErr } = await admin
     .from('checkout_transactions')
     .insert({
       member_id,
-      dispensation_id:      dispensation.id,
-      dispensation_amount:  dispensationAmount,
-      products_amount:      productsAmount,
-      total_amount:         totalAmount,
-      payment_status:       isFree ? 'pagado' : isFiado ? 'fiado' : 'pagado',
-      payment_method:       isFree || isFiado ? null : payment.method,
-      amount_paid:          isFree || isFiado ? 0 : totalAmount,
-      amount_cash:          amountCash,
-      amount_transfer:      amountTransfer,
-      amount_charged_to_cc: isFiado ? totalAmount : 0,
-      change_given:         changeGiven,
-      payment_id:           paymentId,
-      cc_movement_id:       ccMovementId,
-      notes:                dispInput.notes ?? null,
-      created_by:           user.id,
+      dispensation_id:          dispensation.id,
+      dispensation_amount:      dispensationAmount,
+      products_amount:          productsAmount,
+      total_amount:             totalAmount,
+      payment_status:           paymentStatus,
+      payment_method:           isFree || isFiado ? null : payment.method,
+      amount_paid:              isFree || isFiado ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      amount_cash:              amountCash,
+      amount_transfer:          amountTransfer,
+      amount_charged_to_cc:     isFiado ? totalAmount : amountCC,
+      change_given:             changeGiven,
+      transfer_detail:          transferDetail,
+      transfer_amount_received: transferAmountReceived > 0 ? transferAmountReceived : null,
+      payment_id:               paymentId,
+      cc_movement_id:           ccMovementId ?? ccFiadoMovementId,
+      notes:                    dispInput.notes ?? null,
+      created_by:               user.id,
     })
     .select('id, transaction_number')
     .single()
@@ -439,8 +516,6 @@ export async function POST(request: NextRequest) {
 
     if (itemsErr) {
       console.error('checkout: error creating checkout_items:', itemsErr.code)
-      // No revertimos aquí — la dispensa y transacción ya están registradas
-      // Los items son el menor problema (no afectan stock ni CC)
     }
   }
 
@@ -453,10 +528,14 @@ export async function POST(request: NextRequest) {
       total_amount:          totalAmount,
       dispensation_amount:   dispensationAmount,
       products_amount:       productsAmount,
-      payment_status:        isFree ? 'pagado' : isFiado ? 'fiado' : 'pagado',
-      amount_paid:           isFree || isFiado ? 0 : totalAmount,
-      amount_charged_to_cc:  isFiado ? totalAmount : 0,
+      payment_status:        paymentStatus,
+      payment_method:        isFree || isFiado ? null : payment.method,
+      amount_paid:           isFree || isFiado ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      amount_cash:           amountCash,
+      amount_transfer:       amountTransfer,
+      amount_charged_to_cc:  isFiado ? totalAmount : amountCC,
       change_given:          changeGiven,
+      transfer_detail:       transferDetail,
       cc_balance:            ccBalanceAfter,
     },
   }, { status: 201 })
