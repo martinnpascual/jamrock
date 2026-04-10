@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { memberSchema } from '@/lib/validations/member'
+import { logActivity, getUserName } from '@/lib/audit'
 
 // POST — crear socio (solo gerente/secretaria)
 export async function POST(request: NextRequest) {
@@ -47,6 +48,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error al crear socio' }, { status: 500 })
   }
 
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'crear', entity: 'socio', entityId: data.id,
+    description: `Dio de alta al socio ${data.first_name} ${data.last_name} (${data.member_number})`,
+    metadata: { member_number: data.member_number, dni: data.dni },
+  })
+
   return NextResponse.json(data, { status: 201 })
 }
 
@@ -69,6 +78,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  const { data: member } = await admin
+    .from('members')
+    .select('first_name, last_name, member_number')
+    .eq('id', id)
+    .single()
+
   const { error } = await admin
     .from('members')
     .update({
@@ -81,6 +97,16 @@ export async function DELETE(request: NextRequest) {
   if (error) {
     console.error('member delete error:', error.code)
     return NextResponse.json({ error: 'Error al eliminar socio' }, { status: 500 })
+  }
+
+  if (member) {
+    const userName = await getUserName(supabase, user.id)
+    await logActivity({
+      admin, userId: user.id, userName,
+      action: 'eliminar', entity: 'socio', entityId: id,
+      description: `Eliminó (soft) al socio ${member.first_name} ${member.last_name}`,
+      metadata: { member_number: member.member_number },
+    })
   }
 
   return NextResponse.json({ success: true })

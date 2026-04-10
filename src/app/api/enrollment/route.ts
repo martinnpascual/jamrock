@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { enrollmentSchema } from '@/lib/validations/enrollment'
+import { logActivity, getUserName } from '@/lib/audit'
 
 // POST — pública, sin autenticación requerida
 export async function POST(request: NextRequest) {
@@ -136,6 +137,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Error al rechazar' }, { status: 500 })
     }
 
+    const userName = await getUserName(supabase, user.id)
+    await logActivity({
+      admin,
+      userId: user.id,
+      userName,
+      action: 'rechazar',
+      entity: 'solicitud',
+      entityId: body.id,
+      description: `Rechazó solicitud de ${req.first_name} ${req.last_name}`,
+      metadata: { dni: req.dni, reason: body.rejection_reason },
+    })
+
     return NextResponse.json({ status: 'rechazada' })
   }
 
@@ -173,6 +186,18 @@ export async function PATCH(request: NextRequest) {
     console.error('approve error:', updateResult.error?.code, memberResult.error?.code)
     return NextResponse.json({ error: 'Error al aprobar solicitud' }, { status: 500 })
   }
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin,
+    userId: user.id,
+    userName,
+    action: 'aprobar',
+    entity: 'solicitud',
+    entityId: body.id,
+    description: `Aprobó solicitud de ${req.first_name} ${req.last_name} (DNI ${req.dni})`,
+    metadata: { dni: req.dni },
+  })
 
   return NextResponse.json({
     status: 'aprobada',

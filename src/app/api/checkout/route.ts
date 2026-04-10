@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkoutRequestSchema } from '@/lib/validations/checkout'
+import { logActivity, getUserName } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
   // ── Autenticación ─────────────────────────────────────────────────────────
@@ -519,7 +520,34 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── PASO 7: RESPUESTA ─────────────────────────────────────────────────────
+  // ── PASO 7: AUDITORÍA + RESPUESTA ─────────────────────────────────────────
+  const userName = await getUserName(supabase, user.id)
+  const memberName = member?.first_name && member?.last_name
+    ? `${member.first_name} ${member.last_name}` : 'Socio'
+
+  await logActivity({
+    admin,
+    userId: user.id,
+    userName,
+    action: 'dispensar',
+    entity: 'checkout',
+    entityId: transaction.transaction_number,
+    description: `Dispensó ${dispInput.quantity_grams}g de ${dispInput.genetics} a ${memberName} por ${totalAmount > 0 ? `$${totalAmount.toLocaleString('es-AR')}` : 'gratis'} (${paymentStatus})`,
+    metadata: {
+      member_id,
+      member_name: memberName,
+      genetics: dispInput.genetics,
+      grams: dispInput.quantity_grams,
+      total: totalAmount,
+      payment_method: isFree || isFiado ? null : payment.method,
+      payment_status: paymentStatus,
+      amount_cash: amountCash,
+      amount_transfer: amountTransfer,
+      amount_cc: isFiado ? totalAmount : amountCC,
+      products_count: items.length,
+    },
+  })
+
   return NextResponse.json({
     success: true,
     transaction: {

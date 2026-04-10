@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { saleSchema } from '@/lib/validations/sale'
+import { logActivity, getUserName } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
@@ -46,6 +47,15 @@ export async function POST(request: NextRequest) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: 'Error al registrar venta' }, { status: 500 })
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'crear', entity: 'venta', entityId: data.id,
+    description: `Registró venta de ${quantity}u × $${unit_price} = $${data.total} (${payment_method})`,
+    metadata: { product_id, quantity, total: data.total, payment_method },
+  })
+
   return NextResponse.json({ sale: data }, { status: 201 })
 }
 
@@ -62,10 +72,23 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  const { data: sale } = await admin.from('sales').select('total').eq('id', id).single()
+  if (!sale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 })
+
   const { error } = await admin.from('sales').update({
     is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user.id,
   }).eq('id', id)
 
   if (error) return NextResponse.json({ error: 'Error al anular venta' }, { status: 500 })
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'eliminar', entity: 'venta', entityId: id,
+    description: `Eliminó venta por $${sale.total}`,
+    metadata: { total: sale.total },
+  })
+
   return NextResponse.json({ ok: true })
 }

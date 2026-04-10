@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logActivity, getUserName } from '@/lib/audit'
 
 // GET — cajas del día (0, 1 o 2 por turnos)
 export async function GET() {
@@ -107,6 +108,15 @@ export async function POST(request: NextRequest) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: 'Error al abrir caja' }, { status: 500 })
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'abrir', entity: 'caja', entityId: data.id,
+    description: `Abrió caja turno ${shift} del ${today}`,
+    metadata: { shift, date: today },
+  })
+
   return NextResponse.json({ register: data }, { status: 201 })
 }
 
@@ -154,6 +164,14 @@ export async function PATCH(request: NextRequest) {
   }).eq('id', body.id).select().single()
 
   if (error) return NextResponse.json({ error: 'Error al cerrar caja' }, { status: 500 })
+
+  await logActivity({
+    admin, userId: user.id, userName: profile.full_name,
+    action: 'cerrar', entity: 'caja', entityId: data.id,
+    description: `Cerró caja turno ${register.shift} — Esperado: $${Number(register.expected_total).toLocaleString('es-AR')}, Contado: $${body.actual_total.toLocaleString('es-AR')}, Diferencia: $${difference.toLocaleString('es-AR')}`,
+    metadata: { shift: register.shift, expected: Number(register.expected_total), actual: body.actual_total, difference },
+  })
+
   return NextResponse.json({ register: data })
 }
 
@@ -198,5 +216,14 @@ export async function PUT(request: NextRequest) {
   }).eq('id', body.id).select().single()
 
   if (error) return NextResponse.json({ error: 'Error al reabrir caja' }, { status: 500 })
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'reabrir', entity: 'caja', entityId: data.id,
+    description: `Reabrió caja turno ${register.shift} del ${register.register_date}`,
+    metadata: { shift: register.shift, date: register.register_date },
+  })
+
   return NextResponse.json({ register: data })
 }

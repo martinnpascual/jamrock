@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { paymentSchema } from '@/lib/validations/payment'
+import { logActivity, getUserName } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
@@ -57,6 +58,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error al registrar pago' }, { status: 500 })
   }
 
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'pagar', entity: 'pago', entityId: data.id,
+    description: `Registró pago de $${amount} por concepto "${concept}" (${payment_method})`,
+    metadata: { member_id, amount, concept, payment_method },
+  })
+
   return NextResponse.json({ payment: data }, { status: 201 })
 }
 
@@ -86,6 +95,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  const { data: payment } = await admin
+    .from('payments')
+    .select('id, amount')
+    .eq('id', id)
+    .single()
+
   const { error } = await admin
     .from('payments')
     .update({
@@ -98,6 +114,14 @@ export async function DELETE(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: 'Error al anular pago' }, { status: 500 })
   }
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'eliminar', entity: 'pago', entityId: id,
+    description: `Eliminó pago por $${payment?.amount}`,
+    metadata: { amount: payment?.amount },
+  })
 
   return NextResponse.json({ ok: true })
 }

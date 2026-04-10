@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { stockLotSchema } from '@/lib/validations/stock'
+import { logActivity, getUserName } from '@/lib/audit'
 
 // POST — crear nuevo lote de stock medicinal
 export async function POST(request: NextRequest) {
@@ -60,6 +61,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error al registrar lote' }, { status: 500 })
   }
 
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'crear', entity: 'stock', entityId: data.id,
+    description: `Ingresó lote de ${data.genetics} — ${data.initial_grams}g a $${data.price_per_gram}/g`,
+    metadata: { genetics: data.genetics, grams: data.initial_grams, price_per_gram: data.price_per_gram },
+  })
+
   return NextResponse.json({ lot: data }, { status: 201 })
 }
 
@@ -90,6 +99,14 @@ export async function DELETE(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // Fetch lot data before soft-deleting (for audit log)
+  const { data: lot } = await admin
+    .from('medical_stock_lots')
+    .select('genetics, current_grams')
+    .eq('id', id)
+    .single()
+
   const { error } = await admin
     .from('medical_stock_lots')
     .update({
@@ -101,6 +118,16 @@ export async function DELETE(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: 'Error al dar de baja lote' }, { status: 500 })
+  }
+
+  if (lot) {
+    const userName = await getUserName(supabase, user.id)
+    await logActivity({
+      admin, userId: user.id, userName,
+      action: 'eliminar', entity: 'stock', entityId: id,
+      description: `Eliminó lote de ${lot.genetics} (${lot.current_grams}g restantes)`,
+      metadata: { genetics: lot.genetics, remaining: lot.current_grams },
+    })
   }
 
   return NextResponse.json({ ok: true })

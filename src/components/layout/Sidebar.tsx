@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   ArrowDownUp,
+  Activity,
 } from 'lucide-react'
 
 interface NavItem {
@@ -41,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Eventos',      href: '/eventos',      icon: CalendarDays,    roles: ['gerente', 'secretaria', 'cultivador'] },
   { label: 'Solicitudes',  href: '/solicitudes',  icon: ClipboardList,   roles: ['gerente', 'secretaria'] },
   { label: 'Reportes',     href: '/reportes',     icon: BarChart3,       roles: ['gerente'] },
+  { label: 'Actividad',   href: '/actividad',    icon: Activity,        roles: ['gerente'] },
   { label: 'Configuración',href: '/configuracion',icon: Settings,        roles: ['gerente'] },
 ]
 
