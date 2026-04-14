@@ -8,7 +8,7 @@ const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 interface CartSummaryProps {
-  dispensation:         DispensationInput | null
+  dispensations:        DispensationInput[]
   cartItems:            CartItem[]
   dispensationSubtotal: number
   productsSubtotal:     number
@@ -22,7 +22,7 @@ interface CartSummaryProps {
 }
 
 export function CartSummary({
-  dispensation,
+  dispensations,
   cartItems,
   dispensationSubtotal,
   productsSubtotal,
@@ -35,7 +35,8 @@ export function CartSummary({
   onUpdateQty,
 }: CartSummaryProps) {
   const hasItems = cartItems.length > 0
-  const hasAnything = dispensation || hasItems
+  const hasDispensations = dispensations.length > 0
+  const hasAnything = hasDispensations || hasItems
 
   return (
     <div className="bg-[#111111] border border-white/[0.06] rounded-xl p-4 space-y-3 h-fit">
@@ -50,21 +51,30 @@ export function CartSummary({
         </p>
       )}
 
-      {/* Dispensa */}
-      {dispensation && (
+      {/* Dispensas */}
+      {hasDispensations && (
         <div className="space-y-1">
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Dispensa medicinal</p>
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm text-slate-200 truncate">{dispensation.genetics}</p>
-              <p className="text-xs text-slate-500">{dispensation.quantity_grams}g</p>
-            </div>
-            <p className={cn('text-sm font-semibold flex-shrink-0',
-              dispensationSubtotal === 0 ? 'text-[#2DC814]' : 'text-slate-100'
-            )}>
-              {dispensationSubtotal === 0 ? 'Gratis' : ARS(dispensationSubtotal)}
-            </p>
-          </div>
+          {dispensations.map((d, idx) => {
+            const discAmt = d.cost * ((d.discountPercent ?? 0) / 100)
+            const itemTotal = d.cost - discAmt
+            return (
+              <div key={idx} className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-200 truncate">{d.genetics}</p>
+                  <p className="text-xs text-slate-500">
+                    {d.quantity_grams}g
+                    {d.discountPercent > 0 && ` · ${d.discountPercent}% desc.`}
+                  </p>
+                </div>
+                <p className={cn('text-sm font-semibold flex-shrink-0',
+                  itemTotal === 0 ? 'text-[#2DC814]' : 'text-slate-100'
+                )}>
+                  {itemTotal === 0 ? 'Gratis' : ARS(itemTotal)}
+                </p>
+              </div>
+            )
+          })}
         </div>
       )}
 

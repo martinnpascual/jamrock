@@ -71,7 +71,7 @@ export function CheckoutWizard() {
   const { data: config } = useDispensationConfig()
 
   const {
-    currentStep, member, memberCCBalance, dispensation,
+    currentStep, member, memberCCBalance, dispensations,
     cartItems, paymentMethod, amountCash, amountTransfer, amountCC,
     transferDetail, transferAmountReceived,
     changeGiven, dispensationSubtotal, productsSubtotal, total,
@@ -103,12 +103,15 @@ export function CheckoutWizard() {
           {currentStep === 2 && (
             <Step2Dispensation
               config={config}
-              onOnlyDispense={input => {
-                checkout.setDispensation(input)
+              initialDispensations={dispensations.length > 0 ? dispensations : undefined}
+              onOnlyDispense={inputs => {
+                checkout.setDispensation(null) // clear first
+                inputs.forEach(d => checkout.addDispensation(d))
                 checkout.goToStep(4)
               }}
-              onAddProducts={input => {
-                checkout.setDispensation(input)
+              onAddProducts={inputs => {
+                checkout.setDispensation(null) // clear first
+                inputs.forEach(d => checkout.addDispensation(d))
                 checkout.goToStep(3)
               }}
             />
@@ -129,6 +132,7 @@ export function CheckoutWizard() {
               allowCredit={config?.allowCredit ?? true}
               showCCBalance={config?.showCCBalance ?? true}
               paymentMethod={paymentMethod}
+              ccMode={checkout.ccMode}
               amountCash={amountCash}
               amountTransfer={amountTransfer}
               amountCC={amountCC}
@@ -138,13 +142,14 @@ export function CheckoutWizard() {
               isProcessing={isProcessing}
               error={error}
               onSetPaymentMethod={checkout.setPaymentMethod}
+              onSetCCMode={checkout.setCCMode}
               onSetCash={checkout.setCashAmount}
               onSetTransfer={checkout.setTransferAmount}
               onSetCC={checkout.setCCAmount}
               onSetTransferDetail={checkout.setTransferDetail}
               onSetTransferAmountReceived={checkout.setTransferAmountReceived}
               onConfirm={checkout.processCheckout}
-              onBack={() => checkout.goToStep(dispensation && cartItems.length >= 0 ? 3 : 2)}
+              onBack={() => checkout.goToStep(cartItems.length > 0 ? 3 : 2)}
             />
           )}
 
@@ -161,7 +166,7 @@ export function CheckoutWizard() {
         {showCart && (
           <div className="md:sticky md:top-6 h-fit">
             <CartSummary
-              dispensation={dispensation}
+              dispensations={dispensations}
               cartItems={cartItems}
               dispensationSubtotal={dispensationSubtotal}
               productsSubtotal={productsSubtotal}

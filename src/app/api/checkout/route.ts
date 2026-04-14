@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { member_id, dispensation: dispInput, items = [], payment } = parsed.data
+  const { member_id, dispensations: dispInputs, items = [], payment } = parsed.data
   const admin = createAdminClient()
 
   // ── PASO 1: VALIDACIONES ──────────────────────────────────────────────────
@@ -73,22 +73,38 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1c. Lote medicinal existe, no eliminado, stock suficiente
-  const { data: lot, error: lotErr } = await admin
+  // 1c. Validar lotes medicinales: existen, no eliminados, stock suficiente
+  //     Acumular gramos por lot_id para evitar que múltiples dispensas del mismo lote excedan stock
+  const uniqueLotIds = Array.from(new Set(dispInputs.map(d => d.lot_id)))
+  const { data: lotRows, error: lotErr } = await admin
     .from('medical_stock_lots')
     .select('id, genetics, current_grams, price_per_gram')
-    .eq('id', dispInput.lot_id)
+    .in('id', uniqueLotIds)
     .eq('is_deleted', false)
-    .single()
 
-  if (lotErr || !lot) {
-    return NextResponse.json({ error: 'Lote medicinal no encontrado' }, { status: 404 })
+  if (lotErr) {
+    return NextResponse.json({ error: 'Error al validar lotes medicinales' }, { status: 500 })
   }
-  if (lot.current_grams < dispInput.quantity_grams) {
-    return NextResponse.json(
-      { error: `Stock medicinal insuficiente. Disponible: ${lot.current_grams}g` },
-      { status: 422 }
-    )
+
+  const lotsMap = new Map((lotRows ?? []).map(l => [l.id, l]))
+
+  // Acumular gramos solicitados por lote
+  const gramsByLot: Record<string, number> = {}
+  for (const d of dispInputs) {
+    gramsByLot[d.lot_id] = (gramsByLot[d.lot_id] ?? 0) + d.quantity_grams
+  }
+
+  for (const [lotId, gramsNeeded] of Object.entries(gramsByLot)) {
+    const lot = lotsMap.get(lotId)
+    if (!lot) {
+      return NextResponse.json({ error: `Lote medicinal no encontrado: ${lotId}` }, { status: 404 })
+    }
+    if (lot.current_grams < gramsNeeded) {
+      return NextResponse.json(
+        { error: `Stock insuficiente para "${lot.genetics}". Disponible: ${lot.current_grams}g, solicitado: ${gramsNeeded}g` },
+        { status: 422 }
+      )
+    }
   }
 
   // 1d. Validar productos del carrito (batch query)
@@ -125,27 +141,49 @@ export async function POST(request: NextRequest) {
   }
 
   // 1e. Precio por gramo: prioridad al precio del lote, fallback a config global
-  const lotPrice = Number(lot.price_per_gram ?? 0)
-  let pricePerGram = lotPrice
-
-  if (pricePerGram === 0) {
+  // Cargar config global una vez (fallback para lotes sin precio)
+  let globalPricePerGram = 0
+  {
     const { data: configRow } = await admin
       .from('app_config')
       .select('value')
       .eq('key', 'dispensation_price_per_gram')
       .single()
     const dispConfig = (configRow?.value as { enabled: boolean; price: number }) ?? { enabled: false, price: 0 }
-    pricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
+    globalPricePerGram = dispConfig.enabled ? Number(dispConfig.price) : 0
   }
 
-  // 1f. Calcular totales con descuento
-  const dispensationSubtotal = pricePerGram * dispInput.quantity_grams
+  // 1f. Calcular totales con descuento para cada dispensa
   const allowedDiscounts = [0, 5, 10, 15, 20, 25]
-  const discountPercent  = allowedDiscounts.includes(dispInput.discount_percent ?? 0)
-    ? (dispInput.discount_percent ?? 0)
-    : 0
-  const discountAmount   = dispensationSubtotal * (discountPercent / 100)
-  const dispensationAmount = dispensationSubtotal - discountAmount
+
+  interface DispCalc {
+    input: typeof dispInputs[number]
+    lot: typeof lotRows extends (infer T)[] ? T : never
+    pricePerGram: number
+    subtotal: number
+    discountPercent: number
+    discountAmount: number
+    amount: number
+  }
+
+  const dispCalcs: DispCalc[] = dispInputs.map(d => {
+    const lot = lotsMap.get(d.lot_id)!
+    const ppg = Number(lot.price_per_gram ?? 0) || globalPricePerGram
+    const sub = ppg * d.quantity_grams
+    const disc = allowedDiscounts.includes(d.discount_percent ?? 0) ? (d.discount_percent ?? 0) : 0
+    const discAmt = sub * (disc / 100)
+    return {
+      input: d,
+      lot,
+      pricePerGram: ppg,
+      subtotal: sub,
+      discountPercent: disc,
+      discountAmount: discAmt,
+      amount: sub - discAmt,
+    }
+  })
+
+  const dispensationAmount = dispCalcs.reduce((sum, d) => sum + d.amount, 0)
 
   const productsAmount = items.reduce((sum, item) => {
     return sum + (productsMap[item.product_id].price * item.quantity)
@@ -200,7 +238,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1i. Validar CC si hay monto fiado (mixto_3 con CC o cuenta_corriente puro)
+  // 1i. Extraer cc_mode para cuenta_corriente
+  const ccMode = payment.method === 'cuenta_corriente' && 'cc_mode' in payment
+    ? (payment.cc_mode as 'fiado' | 'saldo')
+    : 'fiado'
+
+  // 1j. Validar CC si hay monto fiado (mixto_3 con CC o cuenta_corriente puro)
   if (payment.method === 'cuenta_corriente' || (payment.method === 'mixto_3' && amountCC > 0)) {
     const ccAmount = payment.method === 'cuenta_corriente' ? totalAmount : amountCC
     const { data: ccAccount } = await admin
@@ -210,7 +253,18 @@ export async function POST(request: NextRequest) {
       .eq('is_deleted', false)
       .single()
 
-    if (ccAccount && ccAccount.credit_limit > 0) {
+    // Si es saldo, validar que el balance sea suficiente
+    if (payment.method === 'cuenta_corriente' && ccMode === 'saldo') {
+      const balance = ccAccount?.balance ?? 0
+      if (balance < totalAmount) {
+        return NextResponse.json(
+          { error: `Saldo insuficiente para cubrir el total. Saldo: $${balance}, Total: $${totalAmount}` },
+          { status: 422 }
+        )
+      }
+    }
+
+    if (ccAccount && ccAccount.credit_limit > 0 && ccMode !== 'saldo') {
       const newBalance = ccAccount.balance - ccAmount
       if (newBalance < -ccAccount.credit_limit) {
         return NextResponse.json(
@@ -221,52 +275,76 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── PASO 2: CREAR DISPENSA ────────────────────────────────────────────────
-  const isFiado = payment.method === 'cuenta_corriente'
+  // ── PASO 2: CREAR DISPENSAS ───────────────────────────────────────────────
+  const isFiado = payment.method === 'cuenta_corriente' && ccMode === 'fiado'
+  const isSaldo = payment.method === 'cuenta_corriente' && ccMode === 'saldo'
   const isMixto3 = payment.method === 'mixto_3'
   const paymentStatusForDisp: 'sin_cargo' | 'pagado' | 'fiado' | 'parcial' =
     totalAmount === 0 ? 'sin_cargo'
     : isFiado ? 'fiado'
+    : isSaldo ? 'pagado'
     : (isMixto3 && amountCC > 0) ? 'parcial'
     : 'pagado'
 
-  const { data: dispensation, error: dispErr } = await admin
-    .from('dispensations')
-    .insert({
-      member_id,
-      lot_id:           dispInput.lot_id,
-      genetics:         dispInput.genetics,
-      quantity_grams:   dispInput.quantity_grams,
-      notes:            dispInput.notes ?? null,
-      type:             'normal',
-      created_by:       user.id,
-      price_per_gram:   pricePerGram,
-      subtotal:         dispensationSubtotal,
-      discount_percent: discountPercent,
-      discount_amount:  discountAmount,
-      total_amount:     dispensationAmount,
-      payment_method:   totalAmount === 0 ? null : (isFiado ? 'cuenta_corriente' : payment.method),
-      payment_status:   paymentStatusForDisp,
-    })
-    .select('id, dispensation_number')
-    .single()
+  const createdDispensations: { id: string; dispensation_number: string }[] = []
 
-  if (dispErr || !dispensation) {
-    console.error('checkout: error creating dispensation:', dispErr?.code)
-    return NextResponse.json({ error: 'Error al registrar dispensa' }, { status: 500 })
+  for (const dc of dispCalcs) {
+    const { data: disp, error: dispErr } = await admin
+      .from('dispensations')
+      .insert({
+        member_id,
+        lot_id:           dc.input.lot_id,
+        genetics:         dc.input.genetics,
+        quantity_grams:   dc.input.quantity_grams,
+        notes:            dc.input.notes ?? null,
+        type:             'normal',
+        created_by:       user.id,
+        price_per_gram:   dc.pricePerGram,
+        subtotal:         dc.subtotal,
+        discount_percent: dc.discountPercent,
+        discount_amount:  dc.discountAmount,
+        total_amount:     dc.amount,
+        payment_method:   totalAmount === 0 ? null : ((isFiado || isSaldo) ? 'cuenta_corriente' : payment.method),
+        payment_status:   paymentStatusForDisp,
+      })
+      .select('id, dispensation_number')
+      .single()
+
+    if (dispErr || !disp) {
+      console.error('checkout: error creating dispensation:', dispErr?.code)
+      // Rollback previously created dispensations
+      for (const prev of createdDispensations) {
+        const prevCalc = dispCalcs[createdDispensations.indexOf(prev)]
+        await admin.from('dispensations').insert({
+          member_id,
+          lot_id:         prevCalc.input.lot_id,
+          genetics:       prevCalc.input.genetics,
+          quantity_grams: prevCalc.input.quantity_grams,
+          notes:          'Anulación automática por error en checkout',
+          type:           'anulacion',
+          nullifies_id:   prev.id,
+          created_by:     user.id,
+        })
+      }
+      return NextResponse.json({ error: 'Error al registrar dispensa' }, { status: 500 })
+    }
+    createdDispensations.push(disp)
   }
 
   const rollbackDispensation = async () => {
-    await admin.from('dispensations').insert({
-      member_id,
-      lot_id:         dispInput.lot_id,
-      genetics:       dispInput.genetics,
-      quantity_grams: dispInput.quantity_grams,
-      notes:          'Anulación automática por error en checkout',
-      type:           'anulacion',
-      nullifies_id:   dispensation.id,
-      created_by:     user.id,
-    })
+    for (const disp of createdDispensations) {
+      const dc = dispCalcs[createdDispensations.indexOf(disp)]
+      await admin.from('dispensations').insert({
+        member_id,
+        lot_id:         dc.input.lot_id,
+        genetics:       dc.input.genetics,
+        quantity_grams: dc.input.quantity_grams,
+        notes:          'Anulación automática por error en checkout',
+        type:           'anulacion',
+        nullifies_id:   disp.id,
+        created_by:     user.id,
+      })
+    }
   }
 
   // ── PASO 3: CREAR VENTAS (sin member_id para evitar doble CC) ─────────────
@@ -282,7 +360,7 @@ export async function POST(request: NextRequest) {
         quantity:       item.quantity,
         unit_price:     product.price,
         total:          product.price * item.quantity,
-        payment_method: isFiado ? null : payment.method === 'mixto_3' ? 'mixto_3' : payment.method,
+        payment_method: (isFiado || isSaldo) ? null : payment.method === 'mixto_3' ? 'mixto_3' : payment.method,
         created_by:     user.id,
       })
       .select('id')
@@ -330,10 +408,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 4a. DÉBITO manual por el checkout (total completo)
+    const dispensasParts = dispCalcs.map((dc, i) =>
+      `${dc.input.genetics} ${dc.input.quantity_grams}g`
+    ).join(' + ')
+    const dispensasNumbers = createdDispensations.map(d => d.dispensation_number).join(', ')
     const itemsDescription = items.length > 0
       ? ` + Productos: ${items.map(i => `${productsMap[i.product_id].name} ×${i.quantity}`).join(', ')}`
       : ''
-    const debitDescription = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}${itemsDescription}`
+    const debitDescription = `Dispensa: ${dispensasParts} — ${dispensasNumbers}${itemsDescription}`
+
+    const ccConcept = isSaldo ? 'checkout_saldo' : isFiado ? 'checkout_fiado' : 'checkout_deuda'
 
     const { data: debitMovement, error: debitErr } = await admin
       .from('current_account_movements')
@@ -342,7 +426,7 @@ export async function POST(request: NextRequest) {
         movement_type: 'debito',
         amount:        totalAmount,
         balance_after: 0,
-        concept:       isFiado ? 'checkout_fiado' : 'checkout_deuda',
+        concept:       ccConcept,
         description:   debitDescription,
         source_type:   'manual',
         source_id:     null,
@@ -359,8 +443,8 @@ export async function POST(request: NextRequest) {
     ccMovementId   = debitMovement.id
     ccBalanceAfter = debitMovement.balance_after
 
-    // 4b. PAGO (si no es fiado puro)
-    if (!isFiado) {
+    // 4b. PAGO (si no es fiado ni saldo puro)
+    if (!isFiado && !isSaldo) {
       // Para mixto_3: la parte pagada es cash + transfer (sin CC)
       const paidAmount = isMixto3 ? (amountCash + amountTransfer) : totalAmount
       changeGiven = isMixto3
@@ -368,7 +452,7 @@ export async function POST(request: NextRequest) {
         : Math.max(0, amountCash + amountTransfer - totalAmount)
 
       if (paidAmount > 0) {
-        const paymentNotes = `Dispensa: ${dispInput.genetics} × ${dispInput.quantity_grams}g @ $${pricePerGram.toLocaleString('es-AR')}/g — ${dispensation.dispensation_number}` +
+        const paymentNotes = `Dispensa: ${dispensasParts} — ${dispensasNumbers}` +
           (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
           (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(0)}` : '') +
           (isMixto3 && amountCC > 0 ? ` — Fiado parcial: $${amountCC}` : '') +
@@ -460,8 +544,10 @@ export async function POST(request: NextRequest) {
 
   // ── PASO 5: CREAR checkout_transaction ────────────────────────────────────
   const isFree = totalAmount === 0
+  const isCCPure = isFiado || isSaldo
   const paymentStatus = isFree ? 'pagado'
     : isFiado ? 'fiado'
+    : isSaldo ? 'pagado'
     : (isMixto3 && amountCC > 0) ? 'parcial'
     : 'pagado'
 
@@ -469,22 +555,22 @@ export async function POST(request: NextRequest) {
     .from('checkout_transactions')
     .insert({
       member_id,
-      dispensation_id:          dispensation.id,
+      dispensation_id:          createdDispensations[0].id,
       dispensation_amount:      dispensationAmount,
       products_amount:          productsAmount,
       total_amount:             totalAmount,
       payment_status:           paymentStatus,
-      payment_method:           isFree || isFiado ? null : payment.method,
-      amount_paid:              isFree || isFiado ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      payment_method:           isFree || isCCPure ? null : payment.method,
+      amount_paid:              isFree || isCCPure ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
       amount_cash:              amountCash,
       amount_transfer:          amountTransfer,
-      amount_charged_to_cc:     isFiado ? totalAmount : amountCC,
+      amount_charged_to_cc:     isCCPure ? totalAmount : amountCC,
       change_given:             changeGiven,
       transfer_detail:          transferDetail,
       transfer_amount_received: transferAmountReceived > 0 ? transferAmountReceived : null,
       payment_id:               paymentId,
       cc_movement_id:           ccMovementId ?? ccFiadoMovementId,
-      notes:                    dispInput.notes ?? null,
+      notes:                    dispInputs[0].notes ?? null,
       created_by:               user.id,
     })
     .select('id, transaction_number')
@@ -525,6 +611,9 @@ export async function POST(request: NextRequest) {
   const memberName = member?.first_name && member?.last_name
     ? `${member.first_name} ${member.last_name}` : 'Socio'
 
+  const totalGrams = dispCalcs.reduce((s, d) => s + d.input.quantity_grams, 0)
+  const geneticsSummary = dispCalcs.map(d => `${d.input.quantity_grams}g ${d.input.genetics}`).join(', ')
+
   await logActivity({
     admin,
     userId: user.id,
@@ -532,18 +621,18 @@ export async function POST(request: NextRequest) {
     action: 'dispensar',
     entity: 'checkout',
     entityId: transaction.transaction_number,
-    description: `Dispensó ${dispInput.quantity_grams}g de ${dispInput.genetics} a ${memberName} por ${totalAmount > 0 ? `$${totalAmount.toLocaleString('es-AR')}` : 'gratis'} (${paymentStatus})`,
+    description: `Dispensó ${geneticsSummary} a ${memberName} por ${totalAmount > 0 ? `$${totalAmount.toLocaleString('es-AR')}` : 'gratis'} (${paymentStatus})`,
     metadata: {
       member_id,
       member_name: memberName,
-      genetics: dispInput.genetics,
-      grams: dispInput.quantity_grams,
+      dispensations: dispCalcs.map(d => ({ genetics: d.input.genetics, grams: d.input.quantity_grams })),
+      total_grams: totalGrams,
       total: totalAmount,
-      payment_method: isFree || isFiado ? null : payment.method,
+      payment_method: isFree || isCCPure ? null : payment.method,
       payment_status: paymentStatus,
       amount_cash: amountCash,
       amount_transfer: amountTransfer,
-      amount_cc: isFiado ? totalAmount : amountCC,
+      amount_cc: isCCPure ? totalAmount : amountCC,
       products_count: items.length,
     },
   })
@@ -552,16 +641,16 @@ export async function POST(request: NextRequest) {
     success: true,
     transaction: {
       transaction_number:    transaction.transaction_number,
-      dispensation_number:   dispensation.dispensation_number,
+      dispensation_number:   createdDispensations.map(d => d.dispensation_number).join(', '),
       total_amount:          totalAmount,
       dispensation_amount:   dispensationAmount,
       products_amount:       productsAmount,
       payment_status:        paymentStatus,
-      payment_method:        isFree || isFiado ? null : payment.method,
-      amount_paid:           isFree || isFiado ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      payment_method:        isFree || isCCPure ? null : payment.method,
+      amount_paid:           isFree || isCCPure ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
       amount_cash:           amountCash,
       amount_transfer:       amountTransfer,
-      amount_charged_to_cc:  isFiado ? totalAmount : amountCC,
+      amount_charged_to_cc:  isCCPure ? totalAmount : amountCC,
       change_given:          changeGiven,
       transfer_detail:       transferDetail,
       cc_balance:            ccBalanceAfter,

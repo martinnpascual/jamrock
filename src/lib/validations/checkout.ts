@@ -37,24 +37,28 @@ export const checkoutPaymentSchema = z.discriminatedUnion('method', [
   }),
   z.object({
     method:          z.literal('cuenta_corriente'),
+    cc_mode:         z.enum(['fiado', 'saldo']).optional().default('fiado'),
     amount_cash:     z.number().nonnegative().optional().default(0),
     amount_transfer: z.number().nonnegative().optional().default(0),
   }),
 ])
 
+// ─── Schema individual de dispensa ──────────────────────────────────────────
+export const dispensationSchema = z.object({
+  lot_id:           z.string().uuid('ID de lote inválido'),
+  genetics:         z.string().min(1, 'La genética es requerida').max(100),
+  quantity_grams:   z.number().positive('Los gramos deben ser mayores a 0').max(500),
+  notes:            z.string().max(500).optional(),
+  discount_percent: z.number().int().refine(v => [0,5,10,15,20,25].includes(v), {
+    message: 'El descuento solo puede ser 0, 5, 10, 15, 20 o 25',
+  }).optional().default(0),
+})
+
 // ─── Request completo ────────────────────────────────────────────────────────
 export const checkoutRequestSchema = z.object({
   member_id: z.string().uuid('ID de socio inválido'),
 
-  dispensation: z.object({
-    lot_id:           z.string().uuid('ID de lote inválido'),
-    genetics:         z.string().min(1, 'La genética es requerida').max(100),
-    quantity_grams:   z.number().positive('Los gramos deben ser mayores a 0').max(500),
-    notes:            z.string().max(500).optional(),
-    discount_percent: z.number().int().refine(v => [0,5,10,15,20,25].includes(v), {
-      message: 'El descuento solo puede ser 0, 5, 10, 15, 20 o 25',
-    }).optional().default(0),
-  }),
+  dispensations: z.array(dispensationSchema).min(1, 'Se requiere al menos una dispensa'),
 
   items: z.array(checkoutItemSchema).optional().default([]),
 

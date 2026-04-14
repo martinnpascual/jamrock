@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Banknote, ArrowLeftRight, CreditCard, Wallet,
-  AlertTriangle, Loader2, ChevronLeft,
+  AlertTriangle, Loader2, ChevronLeft, TrendingDown, CheckCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { PaymentMethod } from '@/hooks/useCheckout'
+import type { PaymentMethod, CCMode } from '@/hooks/useCheckout'
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -19,6 +19,7 @@ interface Step4Props {
   allowCredit:              boolean
   showCCBalance:            boolean
   paymentMethod:            PaymentMethod | null
+  ccMode:                   CCMode | null
   amountCash:               number
   amountTransfer:           number
   amountCC:                 number
@@ -28,6 +29,7 @@ interface Step4Props {
   isProcessing:             boolean
   error:                    string | null
   onSetPaymentMethod:       (m: PaymentMethod) => void
+  onSetCCMode:              (mode: CCMode) => void
   onSetCash:                (n: number) => void
   onSetTransfer:            (n: number) => void
   onSetCC:                  (n: number) => void
@@ -50,6 +52,7 @@ export function Step4Payment({
   allowCredit,
   showCCBalance,
   paymentMethod,
+  ccMode,
   amountCash,
   amountTransfer,
   amountCC,
@@ -59,6 +62,7 @@ export function Step4Payment({
   isProcessing,
   error,
   onSetPaymentMethod,
+  onSetCCMode,
   onSetCash,
   onSetTransfer,
   onSetCC,
@@ -90,6 +94,8 @@ export function Step4Payment({
       case 'mixto':
         return (amountCash + amountTransfer + amountCC) >= total
       case 'cuenta_corriente':
+        if (!ccMode) return false
+        if (ccMode === 'saldo' && memberCCBalance < total) return false
         return true
       default:
         return false
@@ -356,11 +362,76 @@ export function Step4Payment({
 
       {/* ── Inputs: CUENTA CORRIENTE ── */}
       {paymentMethod === 'cuenta_corriente' && (
-        <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg p-3">
-          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-300/80">
-            El total <strong className="text-amber-300">{ARS(total)}</strong> se cargará como débito en la cuenta corriente del socio.
-          </p>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-400">Seleccioná el modo de cuenta corriente:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Fiado */}
+            <button
+              onClick={() => onSetCCMode('fiado')}
+              className={cn(
+                'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all min-h-[44px]',
+                ccMode === 'fiado'
+                  ? 'bg-amber-500/10 border-amber-500/50 text-slate-100'
+                  : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'
+              )}
+            >
+              <TrendingDown className={cn('w-4 h-4', ccMode === 'fiado' ? 'text-amber-400' : '')} />
+              <p className={cn('text-sm font-medium', ccMode === 'fiado' ? 'text-slate-100' : 'text-slate-300')}>
+                Fiado
+              </p>
+              <p className="text-xs text-slate-500">Cargar como deuda</p>
+            </button>
+            {/* Saldo */}
+            <button
+              onClick={() => onSetCCMode('saldo')}
+              disabled={memberCCBalance < total}
+              className={cn(
+                'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all min-h-[44px]',
+                ccMode === 'saldo'
+                  ? 'bg-[#2DC814]/10 border-[#2DC814]/50 text-slate-100'
+                  : memberCCBalance < total
+                    ? 'bg-white/[0.01] border-white/[0.04] text-slate-600 cursor-not-allowed opacity-60'
+                    : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'
+              )}
+            >
+              <CheckCircle className={cn('w-4 h-4', ccMode === 'saldo' ? 'text-[#2DC814]' : '')} />
+              <p className={cn('text-sm font-medium', ccMode === 'saldo' ? 'text-slate-100' : 'text-slate-300')}>
+                Saldo a favor
+              </p>
+              <p className="text-xs text-slate-500">
+                {memberCCBalance < total ? 'Saldo insuficiente' : 'Usar saldo disponible'}
+              </p>
+            </button>
+          </div>
+
+          {/* Mensaje según modo */}
+          {ccMode === 'fiado' && (
+            <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-300/80">
+                <p>El total <strong className="text-amber-300">{ARS(total)}</strong> se cargará como deuda en la cuenta corriente del socio.</p>
+                {showCCBalance && (
+                  <p className="mt-1 text-slate-500">
+                    Saldo actual: {ARS(memberCCBalance)} → Nuevo saldo: <span className={cn(
+                      'font-semibold',
+                      (memberCCBalance - total) < 0 ? 'text-red-400' : 'text-[#2DC814]'
+                    )}>{ARS(memberCCBalance - total)}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {ccMode === 'saldo' && (
+            <div className="flex items-start gap-2 bg-[#2DC814]/5 border border-[#2DC814]/20 rounded-lg p-3">
+              <CheckCircle className="w-4 h-4 text-[#2DC814] flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-[#2DC814]/80">
+                <p>Se descontarán <strong className="text-[#2DC814]">{ARS(total)}</strong> del saldo a favor del socio.</p>
+                <p className="mt-1 text-slate-500">
+                  Saldo actual: {ARS(memberCCBalance)} → Nuevo saldo: <span className="font-semibold text-[#2DC814]">{ARS(memberCCBalance - total)}</span>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

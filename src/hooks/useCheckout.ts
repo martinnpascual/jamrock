@@ -22,6 +22,8 @@ export interface DispensationInput {
   discountPercent:  number  // 0 | 5 | 10 | 15 | 20 | 25
 }
 
+export type CCMode = 'fiado' | 'saldo'
+
 export interface CheckoutResult {
   transaction_number:   string
   dispensation_number:  string
@@ -45,9 +47,10 @@ export interface CheckoutState {
   currentStep:            1 | 2 | 3 | 4 | 5
   member:                 Member | null
   memberCCBalance:        number
-  dispensation:           DispensationInput | null
+  dispensations:          DispensationInput[]
   cartItems:              CartItem[]
   paymentMethod:          PaymentMethod | null
+  ccMode:                 CCMode | null
   amountCash:             number
   amountTransfer:         number
   amountCC:               number
@@ -64,9 +67,10 @@ const initialState: CheckoutState = {
   currentStep:            1,
   member:                 null,
   memberCCBalance:        0,
-  dispensation:           null,
+  dispensations:          [],
   cartItems:              [],
   paymentMethod:          null,
+  ccMode:                 null,
   amountCash:             0,
   amountTransfer:         0,
   amountCC:               0,
@@ -84,11 +88,11 @@ export function useCheckout() {
 
   // ── Totales calculados ────────────────────────────────────────────────────
   const dispensationSubtotal = useMemo(() => {
-    if (!state.dispensation) return 0
-    const { cost, discountPercent } = state.dispensation
-    const discountAmount = cost * ((discountPercent ?? 0) / 100)
-    return cost - discountAmount
-  }, [state.dispensation])
+    return state.dispensations.reduce((sum, d) => {
+      const discountAmount = d.cost * ((d.discountPercent ?? 0) / 100)
+      return sum + (d.cost - discountAmount)
+    }, 0)
+  }, [state.dispensations])
 
   const productsSubtotal = useMemo(
     () => state.cartItems.reduce((sum, i) => sum + i.subtotal, 0),
@@ -117,7 +121,24 @@ export function useCheckout() {
   }, [])
 
   const setDispensation = useCallback((dispensation: DispensationInput | null) => {
-    setState(s => ({ ...s, dispensation }))
+    setState(s => ({
+      ...s,
+      dispensations: dispensation ? [dispensation] : [],
+    }))
+  }, [])
+
+  const addDispensation = useCallback((dispensation: DispensationInput) => {
+    setState(s => ({
+      ...s,
+      dispensations: [...s.dispensations, dispensation],
+    }))
+  }, [])
+
+  const removeDispensation = useCallback((index: number) => {
+    setState(s => ({
+      ...s,
+      dispensations: s.dispensations.filter((_, i) => i !== index),
+    }))
   }, [])
 
   const goToStep = useCallback((step: CheckoutState['currentStep']) => {
@@ -167,12 +188,17 @@ export function useCheckout() {
     setState(s => ({
       ...s,
       paymentMethod: method,
+      ccMode: null,
       amountCash: 0,
       amountTransfer: 0,
       amountCC: 0,
       transferDetail: '',
       transferAmountReceived: 0,
     }))
+  }, [])
+
+  const setCCMode = useCallback((mode: CCMode | null) => {
+    setState(s => ({ ...s, ccMode: mode }))
   }, [])
 
   const setCashAmount = useCallback((amount: number) => {
@@ -198,8 +224,14 @@ export function useCheckout() {
   // ── processCheckout ───────────────────────────────────────────────────────
 
   const processCheckout = useCallback(async () => {
-    if (!state.member || !state.dispensation || !state.paymentMethod) {
+    if (!state.member || state.dispensations.length === 0 || !state.paymentMethod) {
       setState(s => ({ ...s, error: 'Datos incompletos para procesar el checkout' }))
+      return
+    }
+
+    // Validar ccMode si es cuenta_corriente
+    if (state.paymentMethod === 'cuenta_corriente' && !state.ccMode) {
+      setState(s => ({ ...s, error: 'Seleccioná si es fiado o saldo' }))
       return
     }
 
@@ -207,13 +239,13 @@ export function useCheckout() {
 
     const body = {
       member_id: state.member.id,
-      dispensation: {
-        lot_id:           state.dispensation.lot_id,
-        genetics:         state.dispensation.genetics,
-        quantity_grams:   state.dispensation.quantity_grams,
-        notes:            state.dispensation.notes || undefined,
-        discount_percent: state.dispensation.discountPercent ?? 0,
-      },
+      dispensations: state.dispensations.map(d => ({
+        lot_id:           d.lot_id,
+        genetics:         d.genetics,
+        quantity_grams:   d.quantity_grams,
+        notes:            d.notes || undefined,
+        discount_percent: d.discountPercent ?? 0,
+      })),
       items: state.cartItems.map(i => ({
         product_id: i.product_id,
         quantity:   i.quantity,
@@ -254,17 +286,22 @@ export function useCheckout() {
 
   return {
     ...state,
+    // Backward compat: expose first dispensation as `dispensation`
+    dispensation: state.dispensations[0] ?? null,
     dispensationSubtotal,
     productsSubtotal,
     total,
     changeGiven,
     setMember,
     setDispensation,
+    addDispensation,
+    removeDispensation,
     goToStep,
     addToCart,
     removeFromCart,
     updateCartQuantity,
     setPaymentMethod,
+    setCCMode,
     setCashAmount,
     setTransferAmount,
     setCCAmount,
@@ -278,7 +315,7 @@ export function useCheckout() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildPaymentPayload(state: CheckoutState) {
-  const { paymentMethod, amountCash, amountTransfer, amountCC, transferDetail, transferAmountReceived } = state
+  const { paymentMethod, ccMode, amountCash, amountTransfer, amountCC, transferDetail, transferAmountReceived } = state
 
   const transferFields = (amountTransfer > 0 || transferDetail)
     ? {
@@ -297,8 +334,8 @@ function buildPaymentPayload(state: CheckoutState) {
     case 'mixto_3':
       return { method: 'mixto_3', amount_cash: amountCash, amount_transfer: amountTransfer, amount_cc: amountCC, ...transferFields }
     case 'cuenta_corriente':
-      return { method: 'cuenta_corriente' }
+      return { method: 'cuenta_corriente', cc_mode: ccMode ?? 'fiado' }
     default:
-      return { method: 'cuenta_corriente' }
+      return { method: 'cuenta_corriente', cc_mode: ccMode ?? 'fiado' }
   }
 }
