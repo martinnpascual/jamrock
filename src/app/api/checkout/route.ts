@@ -408,7 +408,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4a. DÉBITO manual por el checkout (total completo)
-    const dispensasParts = dispCalcs.map((dc, i) =>
+    const dispensasParts = dispCalcs.map(dc =>
       `${dc.input.genetics} ${dc.input.quantity_grams}g`
     ).join(' + ')
     const dispensasNumbers = createdDispensations.map(d => d.dispensation_number).join(', ')
