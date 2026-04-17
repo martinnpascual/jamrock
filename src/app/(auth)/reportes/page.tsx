@@ -6,12 +6,16 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar, Lock, TrendingUp } from 'lucide-react'
+import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar, Lock, TrendingUp, Clock } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/utils'
 
-type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja' | 'rentabilidad'
+type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja' | 'rentabilidad' | 'horas'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60); const m = min % 60
+  if (h === 0) return `${m}m`; if (m === 0) return `${h}h`; return `${h}h ${m}m`
+}
 
 function useDateRange(from: string, to: string) {
   return {
@@ -78,6 +82,12 @@ function useReportData(type: ReportType, from: string, to: string, shiftFilter: 
           .limit(200)
         return data ?? []
       }
+      if (type === 'horas') {
+        const month = from.slice(0, 7)
+        const res = await fetch(`/api/work-sessions?month=${month}`)
+        if (!res.ok) throw new Error('Error al cargar sesiones')
+        return res.json()
+      }
       if (type === 'caja') {
         let query = supabase
           .from('cash_registers')
@@ -140,6 +150,7 @@ export default function ReportesPage() {
     { id: 'stock', label: 'Stock medicinal', Icon: Package, desc: 'Estado actual de lotes' },
     { id: 'caja', label: 'Cierre de caja', Icon: Lock, desc: 'Cierres por turno y fecha' },
     { id: 'rentabilidad', label: 'Rentabilidad', Icon: TrendingUp, desc: 'Genéticas tercerizadas', gerenteOnly: true },
+    { id: 'horas', label: 'Horas', Icon: Clock, desc: 'Turnos por operador', gerenteOnly: true },
   ] as { id: ReportType; label: string; Icon: React.ComponentType<{ className?: string }>; desc: string; gerenteOnly?: boolean }[]
   ).filter((r) => !r.gerenteOnly || isGerente)
 
@@ -184,6 +195,31 @@ export default function ReportesPage() {
       const csv = toCSV((data as any[]).map(d => [d.genetics, d.initial_grams, d.current_grams, d.initial_grams - d.current_grams, d.cost_per_gram ?? '', new Date(d.lot_date).toLocaleDateString('es-AR')]),
         ['Genética', 'Gramos iniciales', 'Gramos actuales', 'Gramos dispensados', 'Costo/g', 'Fecha lote'])
       downloadCSV(csv, `stock_${stamp}.csv`)
+    }
+
+    if (type === 'horas') {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const horasData = data as any
+      const profileMap = new Map((horasData.profiles ?? []).map((p: any) => [p.id, p]))
+      const rows = [...(horasData.sessions ?? [])]
+        .sort((a: any, b: any) => new Date(b.login_at).getTime() - new Date(a.login_at).getTime())
+        .map((s: any) => {
+          const profile: any = profileMap.get(s.user_id)
+          const loginDate = new Date(s.login_at)
+          const logoutDate = s.logout_at ? new Date(s.logout_at) : null
+          return [
+            profile?.full_name ?? '—',
+            profile?.role ?? '—',
+            loginDate.toLocaleDateString('es-AR'),
+            loginDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+            logoutDate ? logoutDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : 'En curso',
+            s.duration_minutes != null ? formatMinutes(s.duration_minutes) : '—',
+            s.logout_at ? 'Cerrado' : 'Activo',
+          ]
+        })
+      const csv = toCSV(rows, ['Operador', 'Rol', 'Fecha', 'Inicio turno', 'Fin turno', 'Duración', 'Estado'])
+      downloadCSV(csv, `horas_${from.slice(0, 7)}.csv`)
+      /* eslint-enable @typescript-eslint/no-explicit-any */
     }
 
     if (type === 'rentabilidad') {
@@ -231,15 +267,18 @@ export default function ReportesPage() {
     }
   }
 
-  // Show date range for these report types
-  const showDateRange = ['dispensas', 'financiero', 'caja'].includes(type)
-  // Rentabilidad uses no date range (shows all outsourced lots)
+  const showDateRange = ['dispensas', 'financiero', 'caja', 'horas'].includes(type)
 
   function getRecordCount(): string {
     if (!data) return '0 registros'
     if (type === 'financiero') {
       const fd = data as { sales: unknown[]; payments: unknown[] }
       return `${fd.sales.length + fd.payments.length} registros`
+    }
+    if (type === 'horas') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const h = data as any
+      return `${(h.sessions ?? []).length} sesiones`
     }
     return `${(data as unknown[]).length} registros`
   }
@@ -283,12 +322,23 @@ export default function ReportesPage() {
         <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3 border border-white/[0.06]">
           <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-slate-500">Período:</span>
-            <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-              className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
-            <span className="text-xs text-slate-500">hasta</span>
-            <input type="date" value={to} onChange={e => setTo(e.target.value)}
-              className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
+            {type === 'horas' ? (
+              <>
+                <span className="text-xs text-slate-500">Mes:</span>
+                <input type="month" value={from.slice(0, 7)} onChange={e => { setFrom(e.target.value + '-01'); setTo(e.target.value + '-31') }}
+                  className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
+                <span className="text-xs text-slate-500">— muestra todas las sesiones del mes</span>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-slate-500">Período:</span>
+                <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+                  className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
+                <span className="text-xs text-slate-500">hasta</span>
+                <input type="date" value={to} onChange={e => setTo(e.target.value)}
+                  className="text-sm border border-white/[0.1] bg-[#111111] text-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50" />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -351,6 +401,7 @@ export default function ReportesPage() {
             {type === 'stock' && <StockTable data={data as unknown as StockRow[]} />}
             {type === 'caja' && <CajaTable data={data as unknown as CajaRow[]} />}
             {type === 'rentabilidad' && <RentabilidadTable data={data as unknown as RentabilidadRow[]} />}
+            {type === 'horas' && <HorasTable data={data as unknown as HorasReportData} />}
           </div>
         )}
       </div>
@@ -692,6 +743,123 @@ function RentabilidadTable({ data }: { data: RentabilidadRow[] }) {
                   ) : '—'}
                 </TD>
                 <TD className="text-slate-400">{new Date(d.lot_date).toLocaleDateString('es-AR')}</TD>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+type HorasReportData = {
+  sessions: { id: string; user_id: string; login_at: string; logout_at: string | null; duration_minutes: number | null }[]
+  profiles: { id: string; full_name: string; role: string }[]
+}
+
+function HorasTable({ data }: { data: HorasReportData }) {
+  if (!data?.sessions?.length) {
+    return (
+      <div className="flex flex-col items-center py-12 text-center">
+        <Clock className="w-8 h-8 text-slate-600 mb-2" />
+        <p className="text-sm text-slate-500">Sin sesiones registradas para este mes</p>
+      </div>
+    )
+  }
+
+  const profileMap = new Map(data.profiles.map((p) => [p.id, p]))
+
+  // Summary by user
+  const byUser = new Map<string, typeof data.sessions>()
+  for (const s of data.sessions) {
+    if (!byUser.has(s.user_id)) byUser.set(s.user_id, [])
+    byUser.get(s.user_id)!.push(s)
+  }
+  const summaries = Array.from(byUser.entries())
+    .map(([uid, sessions]) => ({
+      uid,
+      profile: profileMap.get(uid),
+      totalMinutes: sessions.filter((s) => s.duration_minutes != null).reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0),
+      count: sessions.length,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes)
+
+  const flatSessions = [...data.sessions].sort(
+    (a, b) => new Date(b.login_at).getTime() - new Date(a.login_at).getTime()
+  )
+
+  return (
+    <>
+      {/* Resumen por operador */}
+      <div className="px-5 py-3 bg-sky-500/5 border-b border-sky-500/10 flex flex-wrap gap-x-6 gap-y-1">
+        {summaries.map((s) => (
+          <span key={s.uid} className="text-sm text-sky-400">
+            <span className="font-semibold">{s.profile?.full_name ?? '—'}</span>
+            <span className="text-slate-500 ml-1 capitalize text-xs">({s.profile?.role})</span>
+            {' · '}
+            <span className="font-bold">{formatMinutes(s.totalMinutes)}</span>
+            <span className="text-slate-600 text-xs ml-1">{s.count} sesión{s.count !== 1 ? 'es' : ''}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* Detalle sesión por sesión */}
+      <table className="w-full">
+        <thead>
+          <tr>
+            <TH>Operador</TH>
+            <TH>Fecha</TH>
+            <TH>Inicio turno</TH>
+            <TH>Fin turno</TH>
+            <TH>Duración</TH>
+            <TH>Estado</TH>
+          </tr>
+        </thead>
+        <tbody>
+          {flatSessions.map((s) => {
+            const profile = profileMap.get(s.user_id)
+            const loginDate = new Date(s.login_at)
+            const logoutDate = s.logout_at ? new Date(s.logout_at) : null
+            const isActive = !s.logout_at
+            return (
+              <tr key={s.id} className={cn('hover:bg-white/[0.02]', isActive && 'bg-[#2DC814]/[0.02]')}>
+                <TD>
+                  <span className="font-medium text-slate-200">{profile?.full_name ?? '—'}</span>
+                  <span className="ml-2 text-xs text-slate-500 capitalize">{profile?.role}</span>
+                </TD>
+                <TD className="text-slate-400 capitalize">
+                  {loginDate.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                </TD>
+                <TD>
+                  <span className="font-mono font-semibold text-[#2DC814]">
+                    {loginDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </TD>
+                <TD>
+                  {logoutDate ? (
+                    <span className="font-mono font-semibold text-slate-300">
+                      {logoutDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 text-xs font-medium">En curso</span>
+                  )}
+                </TD>
+                <TD>
+                  <span className={cn('font-bold tabular-nums', s.duration_minutes != null ? 'text-slate-200' : 'text-slate-500')}>
+                    {s.duration_minutes != null ? formatMinutes(s.duration_minutes) : '—'}
+                  </span>
+                </TD>
+                <TD>
+                  {isActive ? (
+                    <Badge variant="outline" className="text-xs text-amber-400 border-amber-500/20 bg-amber-950/20">
+                      Activo
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-slate-500 border-white/10">
+                      Cerrado
+                    </Badge>
+                  )}
+                </TD>
               </tr>
             )
           })}
