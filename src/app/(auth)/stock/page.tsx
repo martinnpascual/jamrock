@@ -352,10 +352,10 @@ function StatCard({ label, value, color, bg, warn }: { label: string; value: str
 function EmptyStockState({ onAdd, canCreate }: { onAdd: () => void; canCreate: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-        <Package className="w-6 h-6 text-slate-400" />
+      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-4">
+        <Package className="w-6 h-6 text-slate-500" />
       </div>
-      <p className="text-sm font-medium text-slate-700">Sin lotes registrados</p>
+      <p className="text-sm font-medium text-slate-300">Sin lotes registrados</p>
       <p className="text-xs text-slate-400 mt-1 mb-4">
         Registrá el primer lote para que las dispensas descuenten stock automáticamente.
       </p>

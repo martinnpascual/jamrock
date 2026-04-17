@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/hooks/useRole'
+import { useAlertCounts } from '@/hooks/useAlertCounts'
 import {
   LayoutDashboard,
   Users,
@@ -49,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { role, displayName, loading } = useRole()
+  const { solicitudesPendientes, reprocannVencidos } = useAlertCounts()
 
   const visibleItems = NAV_ITEMS.filter(item =>
     role ? item.roles.includes(role) : false
@@ -102,9 +104,23 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               >
                 <Icon className={cn('w-4 h-4 flex-shrink-0 transition-colors', isActive ? 'text-[#2DC814]' : 'text-slate-500')} />
                 {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 bg-[#C8FF1C] rounded-full shadow-sm shadow-[#C8FF1C]/50" />
-                )}
+                {(() => {
+                  const alertCount =
+                    item.href === '/solicitudes' ? solicitudesPendientes
+                    : item.href === '/socios' ? reprocannVencidos
+                    : 0
+                  if (alertCount > 0) {
+                    return (
+                      <span className="ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                        {alertCount > 99 ? '99+' : alertCount}
+                      </span>
+                    )
+                  }
+                  if (isActive) {
+                    return <span className="ml-auto w-1.5 h-1.5 bg-[#C8FF1C] rounded-full shadow-sm shadow-[#C8FF1C]/50" />
+                  }
+                  return null
+                })()}
               </Link>
             )
           })

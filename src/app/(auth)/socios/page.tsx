@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import { MembersTable } from '@/components/tables/MembersTable'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function SociosPage() {
   return (
@@ -9,7 +11,13 @@ export default function SociosPage() {
           Gestión de socios, estados REPROCANN y carnets digitales
         </p>
       </div>
-      <MembersTable />
+      <Suspense fallback={
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+        </div>
+      }>
+        <MembersTable />
+      </Suspense>
     </div>
   )
 }

@@ -83,6 +83,9 @@ export default async function DashboardPage() {
   const isGerente = profile?.role === 'gerente'
   const firstName = profile?.full_name?.split(' ')[0] ?? null
 
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Buen día' : hour < 20 ? 'Buenas tardes' : 'Buenas noches'
+
   const ventasHoyTotal = (ventasHoyRes.data ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
   const fiadoHoyTotal  = (fiadoHoyRes.data  ?? []).reduce((s: number, r: { total_amount: number }) => s + (r.total_amount ?? 0), 0)
 
@@ -114,7 +117,7 @@ export default async function DashboardPage() {
     <div className="space-y-6 max-w-6xl">
       <div>
         <h2 className="text-lg font-semibold text-foreground">
-          Buen día{firstName ? `, ${firstName}` : ''}
+          {greeting}{firstName ? `, ${firstName}` : ''}
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           {new Date().toLocaleDateString('es-AR', {
@@ -180,7 +183,7 @@ export default async function DashboardPage() {
             icon={ShoppingCart}
             color="text-emerald-400"
             bg="bg-emerald-900/30"
-            href="/dispensas"
+            href="/ventas"
           />
         )}
         {isGerente && fiadoHoyTotal > 0 && (
@@ -190,7 +193,7 @@ export default async function DashboardPage() {
             icon={Banknote}
             color="text-amber-400"
             bg="bg-amber-900/30"
-            href="/dispensas"
+            href="/cuentas-corrientes"
           />
         )}
       </div>
