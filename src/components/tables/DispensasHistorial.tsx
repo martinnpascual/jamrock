@@ -3,8 +3,12 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useDispensations } from '@/hooks/useDispensations'
+import { useMonthlyPaymentStatus } from '@/hooks/usePayments'
 import { useRole } from '@/hooks/useRole'
+import { useFilters } from '@/hooks/useFilters'
 import { useQueryClient } from '@tanstack/react-query'
+import { FilterBar } from '@/components/shared/FilterBar'
+import type { FilterDef } from '@/components/shared/FilterBar'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -35,7 +39,6 @@ type DispensationWithMember = {
   type: 'normal' | 'anulacion'
   notes: string | null
   created_at: string
-  // Campos de precio (pueden ser null en registros viejos)
   price_per_gram:   number | null
   subtotal:         number | null
   discount_percent: number | null
@@ -52,13 +55,56 @@ type DispensationWithMember = {
   } | null
 }
 
+const FILTER_KEYS = ['genetica', 'reprocann', 'cuota', 'desde', 'hasta']
+
+function buildDispensaFilters(genetics: string[]): FilterDef[] {
+  return [
+    {
+      type: 'select',
+      key: 'genetica',
+      label: 'Genética',
+      placeholder: 'Todas',
+      options: genetics.map((g) => ({ value: g, label: g })),
+    },
+    {
+      type: 'select',
+      key: 'reprocann',
+      label: 'REPROCANN socio',
+      placeholder: 'Todos',
+      options: [
+        { value: 'activo', label: 'Activo' },
+        { value: 'en_tramite', label: 'En trámite' },
+        { value: 'vencido', label: 'Vencido' },
+        { value: 'cancelado', label: 'Cancelado' },
+      ],
+    },
+    {
+      type: 'select',
+      key: 'cuota',
+      label: 'Estado cuota',
+      placeholder: 'Todos',
+      options: [
+        { value: 'al_dia', label: 'Al día' },
+        { value: 'con_deuda', label: 'Con deuda' },
+      ],
+    },
+    {
+      type: 'daterange',
+      fromKey: 'desde',
+      toKey: 'hasta',
+      label: 'Rango de fechas',
+    },
+  ]
+}
+
 export function DispensasHistorial() {
-  const { data, isLoading, error } = useDispensations(100)
+  const { data, isLoading, error } = useDispensations(500)
+  const { data: paidMemberIds } = useMonthlyPaymentStatus()
   const { isGerente } = useRole()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const { values: filters, set: setFilter, clear: clearFilters } = useFilters(FILTER_KEYS)
 
-  // Void dialog state
   const [voidTarget, setVoidTarget] = useState<DispensationWithMember | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voidLoading, setVoidLoading] = useState(false)
@@ -69,23 +115,58 @@ export function DispensasHistorial() {
     [data]
   )
 
-  const filtered = useMemo(() => {
-    if (!search) return dispensations
-    const q = search.toLowerCase()
-    return dispensations.filter((d) => {
-      const memberName = d.members
-        ? `${d.members.first_name} ${d.members.last_name}`.toLowerCase()
-        : ''
-      return (
-        memberName.includes(q) ||
-        d.dispensation_number.toLowerCase().includes(q) ||
-        d.genetics.toLowerCase().includes(q) ||
-        d.members?.member_number.toLowerCase().includes(q)
-      )
-    })
-  }, [dispensations, search])
+  // Distinct genetics for the filter dropdown
+  const distinctGenetics = useMemo(() => {
+    const set = new Set<string>()
+    dispensations.forEach((d) => { if (d.genetics) set.add(d.genetics) })
+    return Array.from(set).sort()
+  }, [dispensations])
 
-  // Stats de hoy
+  const dispensaFilters = useMemo(() => buildDispensaFilters(distinctGenetics), [distinctGenetics])
+
+  const filtered = useMemo(() => {
+    return dispensations.filter((d) => {
+      // Text search
+      if (search) {
+        const q = search.toLowerCase()
+        const memberName = d.members
+          ? `${d.members.first_name} ${d.members.last_name}`.toLowerCase()
+          : ''
+        const matchesSearch =
+          memberName.includes(q) ||
+          d.dispensation_number.toLowerCase().includes(q) ||
+          d.genetics.toLowerCase().includes(q) ||
+          d.members?.member_number.toLowerCase().includes(q)
+        if (!matchesSearch) return false
+      }
+
+      // Genetics filter
+      if (filters.genetica && d.genetics !== filters.genetica) return false
+
+      // REPROCANN filter (of the member)
+      if (filters.reprocann && d.members?.reprocann_status !== filters.reprocann) return false
+
+      // Payment status filter
+      if (filters.cuota && paidMemberIds && d.members) {
+        const paid = paidMemberIds.has(d.members.id)
+        if (filters.cuota === 'al_dia' && !paid) return false
+        if (filters.cuota === 'con_deuda' && paid) return false
+      }
+
+      // Date range filter
+      if (filters.desde) {
+        const from = new Date(filters.desde + 'T00:00:00')
+        if (new Date(d.created_at) < from) return false
+      }
+      if (filters.hasta) {
+        const to = new Date(filters.hasta + 'T23:59:59')
+        if (new Date(d.created_at) > to) return false
+      }
+
+      return true
+    })
+  }, [dispensations, search, filters, paidMemberIds])
+
   const today = new Date().toISOString().split('T')[0]
   const todayDispensations = dispensations.filter(
     (d) => d.created_at.startsWith(today) && d.type === 'normal'
@@ -93,15 +174,10 @@ export function DispensasHistorial() {
   const todayGrams = todayDispensations.reduce((sum, d) => sum + (d.quantity_grams ?? 0), 0)
 
   function openVoidDialog(d: DispensationWithMember) {
-    setVoidTarget(d)
-    setVoidReason('')
-    setVoidError(null)
+    setVoidTarget(d); setVoidReason(''); setVoidError(null)
   }
-
   function closeVoidDialog() {
-    setVoidTarget(null)
-    setVoidReason('')
-    setVoidError(null)
+    setVoidTarget(null); setVoidReason(''); setVoidError(null)
   }
 
   async function handleConfirmVoid() {
@@ -110,8 +186,7 @@ export function DispensasHistorial() {
       setVoidError('El motivo debe tener al menos 10 caracteres.')
       return
     }
-    setVoidLoading(true)
-    setVoidError(null)
+    setVoidLoading(true); setVoidError(null)
     try {
       const res = await fetch('/api/dispensations/void', {
         method: 'POST',
@@ -119,10 +194,7 @@ export function DispensasHistorial() {
         body: JSON.stringify({ dispensation_id: voidTarget.id, reason: voidReason.trim() }),
       })
       const body = await res.json()
-      if (!res.ok) {
-        setVoidError(body.error ?? 'Error al anular la dispensa.')
-        return
-      }
+      if (!res.ok) { setVoidError(body.error ?? 'Error al anular la dispensa.'); return }
       await queryClient.invalidateQueries({ queryKey: ['dispensations'] })
       closeVoidDialog()
     } catch {
@@ -152,24 +224,9 @@ export function DispensasHistorial() {
     <div className="space-y-4">
       {/* Stats del día */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatCard
-          label="Dispensas hoy"
-          value={todayDispensations.length.toString()}
-          color="text-sky-400"
-          bg="bg-sky-900/30"
-        />
-        <StatCard
-          label="Gramos hoy"
-          value={`${todayGrams.toFixed(1)}g`}
-          color="text-[#2DC814]"
-          bg="bg-[#2DC814]/10"
-        />
-        <StatCard
-          label="Total historial"
-          value={dispensations.filter((d) => d.type === 'normal').length.toString()}
-          color="text-slate-300"
-          bg="bg-white/[0.04]"
-        />
+        <StatCard label="Dispensas hoy" value={todayDispensations.length.toString()} color="text-sky-400" bg="bg-sky-900/30" />
+        <StatCard label="Gramos hoy" value={`${todayGrams.toFixed(1)}g`} color="text-[#2DC814]" bg="bg-[#2DC814]/10" />
+        <StatCard label="Total historial" value={dispensations.filter((d) => d.type === 'normal').length.toString()} color="text-slate-300" bg="bg-white/[0.04]" />
       </div>
 
       {/* Barra de acciones */}
@@ -195,9 +252,22 @@ export function DispensasHistorial() {
         </div>
       </div>
 
+      {/* FilterBar */}
+      <FilterBar
+        filters={dispensaFilters}
+        values={filters}
+        onSet={setFilter}
+        onClear={clearFilters}
+      />
+
+      {/* Contador */}
+      <div className="text-xs text-slate-500">
+        {filtered.length} de {dispensations.filter(d => d.type === 'normal').length} dispensas normales
+      </div>
+
       {/* Tabla */}
       {filtered.length === 0 ? (
-        <EmptyState hasSearch={!!search} />
+        <EmptyState hasSearch={!!search || Object.values(filters).some(Boolean)} />
       ) : (
         <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
           <div className={cn(
@@ -229,7 +299,7 @@ export function DispensasHistorial() {
         </div>
       )}
 
-      {/* Dialog de confirmación de anulación */}
+      {/* Dialog anulación */}
       <Dialog open={!!voidTarget} onOpenChange={(open) => { if (!open) closeVoidDialog() }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -239,10 +309,8 @@ export function DispensasHistorial() {
             </DialogTitle>
             <DialogDescription>
               Esta acción creará un registro de anulación para{' '}
-              <span className="font-semibold text-slate-200">
-                {voidTarget?.dispensation_number}
-              </span>
-              . El registro original permanece inmutable (REPROCANN).
+              <span className="font-semibold text-slate-200">{voidTarget?.dispensation_number}</span>.
+              El registro original permanece inmutable (REPROCANN).
             </DialogDescription>
           </DialogHeader>
 
@@ -253,27 +321,16 @@ export function DispensasHistorial() {
             <Textarea
               placeholder="Describí el motivo de la anulación (mínimo 10 caracteres)..."
               value={voidReason}
-              onChange={(e) => {
-                setVoidReason(e.target.value)
-                if (voidError) setVoidError(null)
-              }}
+              onChange={(e) => { setVoidReason(e.target.value); if (voidError) setVoidError(null) }}
               rows={3}
               className={cn(voidError ? 'border-red-400 focus-visible:ring-red-400' : '')}
             />
-            {voidError && (
-              <p className="text-xs text-red-500">{voidError}</p>
-            )}
+            {voidError && <p className="text-xs text-red-500">{voidError}</p>}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={closeVoidDialog} disabled={voidLoading}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmVoid}
-              disabled={voidLoading || voidReason.trim().length < 10}
-            >
+            <Button variant="outline" onClick={closeVoidDialog} disabled={voidLoading}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmVoid} disabled={voidLoading || voidReason.trim().length < 10}>
               {voidLoading ? 'Anulando...' : 'Confirmar anulación'}
             </Button>
           </DialogFooter>
@@ -284,36 +341,16 @@ export function DispensasHistorial() {
 }
 
 function PaymentStatusBadge({ status, method, discountPct, amountPaid }: {
-  status:      PaymentStatus
-  method:      string | null
-  discountPct: number | null
-  amountPaid:  number | null
+  status: PaymentStatus; method: string | null; discountPct: number | null; amountPaid: number | null
 }) {
   if (!status || status === 'sin_cargo') {
     return <Badge variant="outline" className="text-xs text-slate-500 border-slate-700">Sin cargo</Badge>
   }
   if (status === 'pagado') {
-    const title = [
-      method ? `vía ${method}` : null,
-      amountPaid ? ARS(amountPaid) : null,
-      discountPct && discountPct > 0 ? `Desc: ${discountPct}%` : null,
-    ].filter(Boolean).join(' · ')
-    return (
-      <Badge
-        variant="outline"
-        className="text-xs text-[#2DC814] border-[#2DC814]/30 bg-[#2DC814]/5 cursor-default"
-        title={title}
-      >
-        Pagado
-      </Badge>
-    )
+    const title = [method ? `vía ${method}` : null, amountPaid ? ARS(amountPaid) : null, discountPct && discountPct > 0 ? `Desc: ${discountPct}%` : null].filter(Boolean).join(' · ')
+    return <Badge variant="outline" className="text-xs text-[#2DC814] border-[#2DC814]/30 bg-[#2DC814]/5 cursor-default" title={title}>Pagado</Badge>
   }
-  // fiado
-  return (
-    <Badge variant="outline" className="text-xs text-amber-400 border-amber-700/50 bg-amber-950/20">
-      Fiado
-    </Badge>
-  )
+  return <Badge variant="outline" className="text-xs text-amber-400 border-amber-700/50 bg-amber-950/20">Fiado</Badge>
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -332,20 +369,14 @@ function buildPriceTooltip(d: DispensationWithMember): string {
   if (d.discount_percent && d.discount_percent > 0) {
     lines.push(`Desc: ${d.discount_percent}% (-${ARS(d.discount_amount ?? 0)})`)
   }
-  if (d.payment_method) {
-    lines.push(PAYMENT_METHOD_LABELS[d.payment_method] ?? d.payment_method)
-  }
+  if (d.payment_method) lines.push(PAYMENT_METHOD_LABELS[d.payment_method] ?? d.payment_method)
   return lines.join(' · ')
 }
 
 function DispensationRow({
-  dispensation: d,
-  isGerente,
-  onVoid,
+  dispensation: d, isGerente, onVoid,
 }: {
-  dispensation: DispensationWithMember
-  isGerente: boolean
-  onVoid: (d: DispensationWithMember) => void
+  dispensation: DispensationWithMember; isGerente: boolean; onVoid: (d: DispensationWithMember) => void
 }) {
   const isAnulacion = d.type === 'anulacion'
   const hasPrice    = d.total_amount != null && d.total_amount > 0
@@ -358,16 +389,11 @@ function DispensationRow({
         : 'lg:grid lg:grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center',
       isAnulacion ? 'bg-red-950/20 opacity-80' : 'hover:bg-white/[0.02]'
     )}>
-      {/* Mobile layout — row with all info */}
       <div className="flex items-start justify-between gap-3 lg:contents">
-        {/* Left: avatar + info */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1 lg:contents">
-          {/* N° — hidden on mobile, shown in desktop grid */}
           <span className="hidden lg:block font-mono text-xs font-semibold text-slate-400">
             {d.dispensation_number}
           </span>
-
-          {/* Socio */}
           <div className="flex items-center gap-2.5 min-w-0">
             {d.members ? (
               <>
@@ -381,11 +407,9 @@ function DispensationRow({
                   >
                     {d.members.first_name} {d.members.last_name}
                   </Link>
-                  {/* Mobile: N° + member_number inline */}
                   <p className="text-xs text-slate-500 lg:hidden">
                     <span className="font-mono font-semibold text-slate-400">{d.dispensation_number}</span>
-                    {' · '}
-                    {d.members.member_number}
+                    {' · '}{d.members.member_number}
                   </p>
                 </div>
               </>
@@ -395,68 +419,40 @@ function DispensationRow({
           </div>
         </div>
 
-        {/* Right side on mobile: grams + badges + action */}
         <div className="flex items-center gap-2 flex-shrink-0 lg:contents">
-          {/* Genética — hidden on mobile */}
           <span className="hidden lg:block text-sm text-slate-300">{d.genetics}</span>
 
-          {/* Gramos */}
-          <span className={cn(
-            'text-sm font-bold tabular-nums',
-            isAnulacion ? 'text-red-400' : 'text-slate-100'
-          )}>
+          <span className={cn('text-sm font-bold tabular-nums', isAnulacion ? 'text-red-400' : 'text-slate-100')}>
             {isAnulacion ? '-' : ''}{d.quantity_grams}g
           </span>
 
-          {/* ABONÓ — solo desktop */}
           <span className="hidden lg:block text-sm tabular-nums" title={buildPriceTooltip(d)}>
             {hasPrice ? (
               d.payment_status === 'fiado' ? (
-                <span className="text-yellow-400 font-medium">
-                  {ARS(d.total_amount!)} <span className="text-xs">(Fiado)</span>
-                </span>
+                <span className="text-yellow-400 font-medium">{ARS(d.total_amount!)} <span className="text-xs">(Fiado)</span></span>
               ) : (
                 <span className="text-green-400 font-medium">
                   {ARS(d.total_amount!)}
-                  {d.discount_percent && d.discount_percent > 0 && (
-                    <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>
-                  )}
+                  {d.discount_percent && d.discount_percent > 0 && <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>}
                 </span>
               )
-            ) : (
-              <span className="text-gray-500">—</span>
-            )}
+            ) : <span className="text-gray-500">—</span>}
           </span>
 
-          {/* PAGO badge — solo desktop */}
           <span className="hidden lg:block">
-            <PaymentStatusBadge
-              status={d.payment_status}
-              method={d.payment_method}
-              discountPct={d.discount_percent}
-              amountPaid={d.total_amount}
-            />
+            <PaymentStatusBadge status={d.payment_status} method={d.payment_method} discountPct={d.discount_percent} amountPaid={d.total_amount} />
           </span>
 
-          {/* Fecha — hidden on mobile */}
           <span className="hidden lg:block text-xs text-slate-500">
-            {new Date(d.created_at).toLocaleDateString('es-AR', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {new Date(d.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </span>
 
-          {/* Tipo badge */}
           {isAnulacion ? (
             <Badge variant="destructive" className="text-xs shrink-0">Anulación</Badge>
           ) : (
             <Badge variant="outline" className="text-xs shrink-0 text-[#2DC814] border-[#2DC814]/30">Normal</Badge>
           )}
 
-          {/* Acción anular — solo gerente, solo dispensas normales */}
           {isGerente && (
             <div className="flex justify-end">
               {!isAnulacion && (
@@ -474,7 +470,7 @@ function DispensationRow({
         </div>
       </div>
 
-      {/* Mobile: genetics + date + pago — second line */}
+      {/* Mobile: second line */}
       <div className="flex items-center gap-2 mt-1 lg:hidden pl-10 flex-wrap">
         <span className="text-xs text-slate-400">{d.genetics}</span>
         <span className="text-slate-600">·</span>
@@ -484,37 +480,17 @@ function DispensationRow({
           </span>
         )}
         {hasPrice && <span className="text-slate-600">·</span>}
-        <PaymentStatusBadge
-          status={d.payment_status}
-          method={d.payment_method}
-          discountPct={d.discount_percent}
-          amountPaid={d.total_amount}
-        />
+        <PaymentStatusBadge status={d.payment_status} method={d.payment_method} discountPct={d.discount_percent} amountPaid={d.total_amount} />
         <span className="text-slate-600">·</span>
         <span className="text-xs text-slate-500">
-          {new Date(d.created_at).toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {new Date(d.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
     </div>
   )
 }
 
-function StatCard({
-  label,
-  value,
-  color,
-  bg,
-}: {
-  label: string
-  value: string
-  color: string
-  bg: string
-}) {
+function StatCard({ label, value, color, bg }: { label: string; value: string; color: string; bg: string }) {
   return (
     <div className={`${bg} rounded-lg p-4 border border-white/[0.05]`}>
       <p className="text-xs text-slate-500 font-medium">{label}</p>
@@ -530,7 +506,7 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
         <Syringe className="w-6 h-6 text-slate-500" />
       </div>
       {hasSearch ? (
-        <p className="text-sm text-slate-400">Sin resultados para tu búsqueda.</p>
+        <p className="text-sm text-slate-400">Sin resultados para tu búsqueda o filtros activos.</p>
       ) : (
         <>
           <p className="text-sm font-medium text-slate-300">Sin dispensas registradas</p>

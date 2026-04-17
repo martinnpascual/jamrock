@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Package, Plus, Loader2, Leaf, ChevronDown, ChevronUp, Trash2, TrendingDown } from 'lucide-react'
+import { Package, Plus, Loader2, Leaf, ChevronDown, ChevronUp, Trash2, TrendingDown, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function StockPage() {
@@ -135,12 +135,35 @@ function LotCard({
               <Leaf className={cn('w-5 h-5', isEmpty ? 'text-slate-500' : 'text-[#2DC814]')} />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-100 truncate">{lot.genetics}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-semibold text-slate-100 truncate">{lot.genetics}</p>
+                {lot.is_outsourced && (
+                  <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-600/30 bg-amber-950/20 flex-shrink-0">
+                    <ExternalLink className="w-2.5 h-2.5 mr-1" />
+                    Tercerizado
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-slate-400">
                 {new Date(lot.lot_date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
                 {lot.price_per_gram > 0 ? ` · Venta: $${lot.price_per_gram.toLocaleString('es-AR')}/g` : ' · Sin precio'}
                 {lot.cost_per_gram ? ` · Costo: $${lot.cost_per_gram}/g` : ''}
+                {lot.is_outsourced && lot.outsourced_provider_name ? ` · ${lot.outsourced_provider_name}` : ''}
               </p>
+              {lot.is_outsourced && lot.cost_total != null && lot.sale_price_total != null && (
+                <p className="text-xs mt-0.5 flex items-center gap-1 flex-wrap">
+                  <span className="text-slate-500">Costo: </span>
+                  <span className="text-red-400">${lot.cost_total.toLocaleString('es-AR')}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-slate-500">Venta: </span>
+                  <span className="text-[#2DC814]">${lot.sale_price_total.toLocaleString('es-AR')}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-slate-500">Gan.: </span>
+                  <span className={cn('font-semibold', (lot.sale_price_total - lot.cost_total) >= 0 ? 'text-[#2DC814]' : 'text-red-400')}>
+                    ${(lot.sale_price_total - lot.cost_total).toLocaleString('es-AR')}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -249,23 +272,29 @@ function LotCard({
 
 function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createMutation = useCreateStockLot()
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<StockLotFormData>({
+  const [isOutsourced, setIsOutsourced] = useState(false)
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<StockLotFormData>({
     resolver: zodResolver(stockLotSchema),
+    defaultValues: { is_outsourced: false },
   })
+
+  const costTotal = watch('cost_total')
+  const salePriceTotal = watch('sale_price_total')
+  const netProfit = (salePriceTotal ?? 0) - (costTotal ?? 0)
+  const margin = costTotal && costTotal > 0 ? ((netProfit / costTotal) * 100).toFixed(1) : null
 
   async function onSubmit(data: StockLotFormData) {
     try {
-      await createMutation.mutateAsync(data)
-      reset()
-      onClose()
+      await createMutation.mutateAsync({ ...data, is_outsourced: isOutsourced })
+      reset(); setIsOutsourced(false); onClose()
     } catch {
       // error shown below
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); setIsOutsourced(false); onClose() } }}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo lote de stock medicinal</DialogTitle>
         </DialogHeader>
@@ -316,6 +345,66 @@ function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void })
             <Label>Fecha del lote</Label>
             <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} {...register('lot_date')} />
           </div>
+
+          {/* Toggle tercerización */}
+          <div className="flex items-center justify-between py-2 border-y border-white/[0.06]">
+            <div>
+              <p className="text-sm font-medium text-slate-200">¿Lote tercerizado?</p>
+              <p className="text-xs text-slate-500">Genética provista por un proveedor externo</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOutsourced((v) => !v)}
+              className={cn(
+                'relative w-11 h-6 rounded-full transition-colors',
+                isOutsourced ? 'bg-amber-500' : 'bg-white/10'
+              )}
+            >
+              <span className={cn(
+                'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                isOutsourced ? 'translate-x-5' : 'translate-x-0.5'
+              )} />
+            </button>
+          </div>
+
+          {/* Campos de tercerización */}
+          {isOutsourced && (
+            <div className="space-y-3 p-3 bg-amber-950/20 border border-amber-900/30 rounded-lg">
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Datos de tercerización</p>
+
+              <div className="space-y-1.5">
+                <Label>Proveedor externo</Label>
+                <Input placeholder="Nombre del proveedor" {...register('outsourced_provider_name')} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Costo total ($)</Label>
+                  <Input type="number" step="0.01" placeholder="0" {...register('cost_total')} />
+                  <p className="text-xs text-slate-500">Lo que pagó el club</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Venta total ($)</Label>
+                  <Input type="number" step="0.01" placeholder="0" {...register('sale_price_total')} />
+                  <p className="text-xs text-slate-500">Lo que cobra el club</p>
+                </div>
+              </div>
+
+              {/* Ganancia en tiempo real */}
+              {(costTotal || salePriceTotal) && (
+                <div className={cn(
+                  'flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold',
+                  netProfit >= 0 ? 'bg-[#2DC814]/10 text-[#2DC814]' : 'bg-red-950/40 text-red-400'
+                )}>
+                  <span>Ganancia neta</span>
+                  <span>
+                    ${netProfit.toLocaleString('es-AR')}
+                    {margin && <span className="text-xs ml-2 opacity-70">({margin}%)</span>}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Notas</Label>

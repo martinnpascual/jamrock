@@ -6,10 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar, Lock } from 'lucide-react'
+import { BarChart3, Download, Users, Syringe, DollarSign, Package, FileText, Calendar, Lock, TrendingUp } from 'lucide-react'
+import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/utils'
 
-type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja'
+type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja' | 'rentabilidad'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 function useDateRange(from: string, to: string) {
@@ -67,6 +68,16 @@ function useReportData(type: ReportType, from: string, to: string, shiftFilter: 
           .limit(200)
         return data ?? []
       }
+      if (type === 'rentabilidad') {
+        const { data } = await supabase
+          .from('medical_stock_lots')
+          .select('genetics, initial_grams, current_grams, lot_date, cost_per_gram, cost_total, sale_price_total, outsourced_provider_name, is_outsourced')
+          .eq('is_deleted', false)
+          .eq('is_outsourced', true)
+          .order('lot_date', { ascending: false })
+          .limit(200)
+        return data ?? []
+      }
       if (type === 'caja') {
         let query = supabase
           .from('cash_registers')
@@ -109,6 +120,8 @@ function downloadCSV(content: string, filename: string) {
 }
 
 export default function ReportesPage() {
+  const { role } = useRole()
+  const isGerente = role === 'gerente'
   const [type, setType] = useState<ReportType>('dispensas')
   const today = new Date().toISOString().split('T')[0]
   const firstOfMonth = today.slice(0, 8) + '01'
@@ -120,13 +133,15 @@ export default function ReportesPage() {
 
   const { data, isLoading } = useReportData(type, from, to, shiftFilter, onlyDiff)
 
-  const REPORTS: { id: ReportType; label: string; Icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
+  const REPORTS = ([
     { id: 'dispensas', label: 'Dispensas', Icon: Syringe, desc: 'Historial completo de entregas' },
     { id: 'socios', label: 'Socios', Icon: Users, desc: 'Padrón general de miembros' },
     { id: 'financiero', label: 'Financiero', Icon: DollarSign, desc: 'Ventas y pagos del período' },
     { id: 'stock', label: 'Stock medicinal', Icon: Package, desc: 'Estado actual de lotes' },
     { id: 'caja', label: 'Cierre de caja', Icon: Lock, desc: 'Cierres por turno y fecha' },
-  ]
+    { id: 'rentabilidad', label: 'Rentabilidad', Icon: TrendingUp, desc: 'Genéticas tercerizadas', gerenteOnly: true },
+  ] as { id: ReportType; label: string; Icon: React.ComponentType<{ className?: string }>; desc: string; gerenteOnly?: boolean }[]
+  ).filter((r) => !r.gerenteOnly || isGerente)
 
   function handleExport() {
     if (!data) return
@@ -171,6 +186,25 @@ export default function ReportesPage() {
       downloadCSV(csv, `stock_${stamp}.csv`)
     }
 
+    if (type === 'rentabilidad') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const csv = toCSV((data as any[]).map((d: any) => {
+        const netProfit = (d.sale_price_total ?? 0) - (d.cost_total ?? 0)
+        const margin = d.cost_total > 0 ? ((netProfit / d.cost_total) * 100).toFixed(1) + '%' : '—'
+        return [
+          d.genetics,
+          d.outsourced_provider_name ?? '—',
+          d.initial_grams,
+          String(d.cost_total ?? '—'),
+          String(d.sale_price_total ?? '—'),
+          String(netProfit),
+          margin,
+          new Date(d.lot_date).toLocaleDateString('es-AR'),
+        ]
+      }), ['Genética', 'Proveedor', 'Gramos', 'Costo total', 'Venta total', 'Ganancia neta', '% margen', 'Fecha lote'])
+      downloadCSV(csv, `rentabilidad_${stamp}.csv`)
+    }
+
     if (type === 'caja') {
       const rows = data as unknown as CajaRow[]
       const csvRows = rows.map(d => {
@@ -199,6 +233,7 @@ export default function ReportesPage() {
 
   // Show date range for these report types
   const showDateRange = ['dispensas', 'financiero', 'caja'].includes(type)
+  // Rentabilidad uses no date range (shows all outsourced lots)
 
   function getRecordCount(): string {
     if (!data) return '0 registros'
@@ -315,6 +350,7 @@ export default function ReportesPage() {
             {type === 'financiero' && <FinancieroTable data={data as unknown as FinancieroData} />}
             {type === 'stock' && <StockTable data={data as unknown as StockRow[]} />}
             {type === 'caja' && <CajaTable data={data as unknown as CajaRow[]} />}
+            {type === 'rentabilidad' && <RentabilidadTable data={data as unknown as RentabilidadRow[]} />}
           </div>
         )}
       </div>
@@ -328,6 +364,7 @@ type SocioRow = { member_number: string; first_name: string; last_name: string; 
 type FinancieroData = { sales: { total: number; payment_method: string | null; created_at: string; commercial_products: { name: string } | null }[]; payments: { amount: number; concept: string; payment_method: string | null; created_at: string; members: { first_name: string; last_name: string } | null }[] }
 type StockRow = { genetics: string; initial_grams: number; current_grams: number; cost_per_gram: number | null; lot_date: string }
 type CajaRow = { id: string; register_date: string; shift: string; expected_total: number; actual_total: number | null; difference: number | null; status: string; closed_by: string | null; closed_at: string | null; notes: string | null; profiles: { full_name: string } | null }
+type RentabilidadRow = { genetics: string; outsourced_provider_name: string | null; initial_grams: number; current_grams: number; cost_total: number | null; sale_price_total: number | null; lot_date: string }
 
 const TH = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <th className={cn('px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-white/[0.02]', className)}>{children}</th>
@@ -574,6 +611,91 @@ function CajaTable({ data }: { data: CajaRow[] }) {
             <TD>{' '}</TD>
           </tr>
         </tfoot>
+      </table>
+    </>
+  )
+}
+
+function RentabilidadTable({ data }: { data: RentabilidadRow[] }) {
+  if (!data.length) {
+    return (
+      <div className="flex flex-col items-center py-12 text-center">
+        <FileText className="w-8 h-8 text-slate-600 mb-2" />
+        <p className="text-sm text-slate-500">Sin lotes tercerizados registrados</p>
+        <p className="text-xs text-slate-600 mt-1">Creá un lote con la opción &quot;¿Lote tercerizado?&quot; activada en Stock</p>
+      </div>
+    )
+  }
+
+  const totalCost = data.reduce((s, d) => s + (d.cost_total ?? 0), 0)
+  const totalSale = data.reduce((s, d) => s + (d.sale_price_total ?? 0), 0)
+  const totalProfit = totalSale - totalCost
+  const avgMargin = totalCost > 0 ? ((totalProfit / totalCost) * 100).toFixed(1) : null
+
+  return (
+    <>
+      <div className="px-5 py-3 bg-amber-500/5 border-b border-amber-500/10 text-sm text-amber-400 flex gap-6 flex-wrap">
+        <span>{data.length} lotes tercerizados</span>
+        <span>Costo total: <strong>{ARS(totalCost)}</strong></span>
+        <span>Venta total: <strong>{ARS(totalSale)}</strong></span>
+        <span className={cn('font-bold', totalProfit >= 0 ? 'text-[#2DC814]' : 'text-red-400')}>
+          Ganancia: {ARS(totalProfit)}
+          {avgMargin && <span className="text-xs ml-1 opacity-70">({avgMargin}%)</span>}
+        </span>
+      </div>
+      <table className="w-full">
+        <thead>
+          <tr>
+            <TH>Genética</TH>
+            <TH>Proveedor</TH>
+            <TH>Gramos</TH>
+            <TH>Costo total</TH>
+            <TH>Venta total</TH>
+            <TH>Ganancia neta</TH>
+            <TH>% Margen</TH>
+            <TH>Fecha lote</TH>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d, i) => {
+            const netProfit = (d.sale_price_total ?? 0) - (d.cost_total ?? 0)
+            const margin = d.cost_total && d.cost_total > 0
+              ? ((netProfit / d.cost_total) * 100).toFixed(1)
+              : null
+            return (
+              <tr key={i} className="hover:bg-white/[0.02]">
+                <TD><span className="font-medium">{d.genetics}</span></TD>
+                <TD className="text-slate-400">{d.outsourced_provider_name ?? '—'}</TD>
+                <TD>{d.initial_grams.toFixed(0)}g</TD>
+                <TD>
+                  {d.cost_total != null
+                    ? <span className="text-red-400">{ARS(d.cost_total)}</span>
+                    : <span className="text-slate-500">—</span>}
+                </TD>
+                <TD>
+                  {d.sale_price_total != null
+                    ? <span className="text-[#2DC814]">{ARS(d.sale_price_total)}</span>
+                    : <span className="text-slate-500">—</span>}
+                </TD>
+                <TD>
+                  {d.cost_total != null && d.sale_price_total != null ? (
+                    <span className={cn('font-semibold', netProfit >= 0 ? 'text-[#2DC814]' : 'text-red-400')}>
+                      {ARS(netProfit)}
+                    </span>
+                  ) : <span className="text-slate-500">—</span>}
+                </TD>
+                <TD>
+                  {margin != null ? (
+                    <span className={cn('text-xs font-semibold', parseFloat(margin) >= 0 ? 'text-[#2DC814]' : 'text-red-400')}>
+                      {margin}%
+                    </span>
+                  ) : '—'}
+                </TD>
+                <TD className="text-slate-400">{new Date(d.lot_date).toLocaleDateString('es-AR')}</TD>
+              </tr>
+            )
+          })}
+        </tbody>
       </table>
     </>
   )

@@ -3,7 +3,11 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useMembers, useDeleteMember } from '@/hooks/useMembers'
+import { useMonthlyPaymentStatus } from '@/hooks/usePayments'
+import { useFilters } from '@/hooks/useFilters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { FilterBar } from '@/components/shared/FilterBar'
+import type { FilterDef } from '@/components/shared/FilterBar'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,21 +23,46 @@ import {
 } from 'lucide-react'
 import type { Member, ReprocannStatus } from '@/types/database'
 import { MEMBER_TYPE_LABELS } from '@/lib/constants'
-import { cn } from '@/lib/utils'
+const FILTER_KEYS = ['reprocann', 'member_type', 'cuota']
 
-const REPROCANN_FILTERS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'activo', label: 'Activos' },
-  { value: 'en_tramite', label: 'En trámite' },
-  { value: 'vencido', label: 'Vencidos' },
-  { value: 'cancelado', label: 'Cancelados' },
+const MEMBER_FILTERS: FilterDef[] = [
+  {
+    type: 'select',
+    key: 'reprocann',
+    label: 'REPROCANN',
+    placeholder: 'Todos los estados',
+    options: [
+      { value: 'activo', label: 'Activo' },
+      { value: 'en_tramite', label: 'En trámite' },
+      { value: 'vencido', label: 'Vencido' },
+      { value: 'cancelado', label: 'Cancelado' },
+    ],
+  },
+  {
+    type: 'select',
+    key: 'member_type',
+    label: 'Tipo de socio',
+    placeholder: 'Todos los tipos',
+    options: Object.entries(MEMBER_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  },
+  {
+    type: 'select',
+    key: 'cuota',
+    label: 'Estado cuota',
+    placeholder: 'Al día y con deuda',
+    options: [
+      { value: 'al_dia', label: 'Al día' },
+      { value: 'con_deuda', label: 'Con deuda' },
+    ],
+  },
 ]
 
 export function MembersTable() {
   const { data: members, isLoading, error } = useMembers()
+  const { data: paidMemberIds } = useMonthlyPaymentStatus()
   const deleteMember = useDeleteMember()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const { values: filters, set: setFilter, clear: clearFilters, hasActive } = useFilters(FILTER_KEYS)
 
   const filtered = useMemo(() => {
     if (!members) return []
@@ -44,19 +73,29 @@ export function MembersTable() {
         m.dni.includes(search) ||
         m.member_number.toLowerCase().includes(search.toLowerCase())
 
-      const matchesStatus =
-        statusFilter === 'all' || m.reprocann_status === statusFilter
+      const matchesReprocann =
+        !filters.reprocann || m.reprocann_status === filters.reprocann
 
-      return matchesSearch && matchesStatus
+      const matchesType =
+        !filters.member_type || m.member_type === filters.member_type
+
+      const matchesCuota = (() => {
+        if (!filters.cuota || !paidMemberIds) return true
+        const paid = paidMemberIds.has(m.id)
+        if (filters.cuota === 'al_dia') return paid
+        if (filters.cuota === 'con_deuda') return !paid
+        return true
+      })()
+
+      return matchesSearch && matchesReprocann && matchesType && matchesCuota
     })
-  }, [members, search, statusFilter])
+  }, [members, search, filters, paidMemberIds])
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`¿Dar de baja a ${name}? Esta acción puede revertirse.`)) return
     await deleteMember.mutateAsync(id)
   }
 
-  // Loading skeleton
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -70,7 +109,6 @@ export function MembersTable() {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <div className="flex items-center justify-center h-48 text-red-500">
@@ -81,18 +119,16 @@ export function MembersTable() {
 
   return (
     <div className="space-y-4">
-      {/* Barra de búsqueda + filtros + CTA */}
+      {/* Barra de búsqueda + CTA */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex gap-2 flex-1 max-w-lg">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder="Buscar por nombre, DNI o número..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10"
-            />
-          </div>
+        <div className="relative flex-1 max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por nombre, DNI o número..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-10"
+          />
         </div>
         <Link href="/socios/nuevo">
           <Button className="bg-green-600 hover:bg-green-700 text-white h-10 gap-2">
@@ -102,52 +138,52 @@ export function MembersTable() {
         </Link>
       </div>
 
-      {/* Filtros por estado */}
-      <div className="flex gap-2 flex-wrap">
-        {REPROCANN_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setStatusFilter(f.value)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              statusFilter === f.value
-                ? 'bg-[#2DC814]/10 text-[#C8FF1C] border-[#2DC814]/30'
-                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/20 hover:text-slate-300'
-            )}
-          >
-            {f.label}
-            {f.value !== 'all' && members && (
-              <span className="ml-1.5 opacity-60">
-                {members.filter((m) => m.reprocann_status === f.value).length}
-              </span>
-            )}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-slate-400 self-center">
+      {/* FilterBar */}
+      <FilterBar
+        filters={MEMBER_FILTERS}
+        values={filters}
+        onSet={setFilter}
+        onClear={clearFilters}
+      />
+
+      {/* Contador */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500">
           {filtered.length} de {members?.length ?? 0} socios
+          {(hasActive || !!search) && (
+            <button
+              onClick={() => {
+                setSearch('')
+                clearFilters()
+              }}
+              className="ml-2 underline underline-offset-2 hover:text-slate-300"
+            >
+              Limpiar
+            </button>
+          )}
         </span>
       </div>
 
       {/* Tabla */}
       {filtered.length === 0 ? (
-        <EmptyState hasSearch={!!search || statusFilter !== 'all'} />
+        <EmptyState hasSearch={!!search || hasActive} />
       ) : (
         <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
-          {/* Header de tabla (oculto en mobile, visible en tablet+) */}
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
             <span>Socio</span>
             <span>N° Socio</span>
             <span>REPROCANN</span>
             <span>Tipo</span>
+            <span>Cuota</span>
             <span>Acciones</span>
           </div>
 
-          {/* Filas */}
           <div className="divide-y divide-white/[0.04]">
             {filtered.map((member) => (
               <MemberRow
                 key={member.id}
                 member={member}
+                paidThisMonth={paidMemberIds?.has(member.id) ?? false}
                 onDelete={handleDelete}
               />
             ))}
@@ -160,16 +196,17 @@ export function MembersTable() {
 
 function MemberRow({
   member,
+  paidThisMonth,
   onDelete,
 }: {
   member: Member
+  paidThisMonth: boolean
   onDelete: (id: string, name: string) => void
 }) {
   const fullName = `${member.first_name} ${member.last_name}`
 
   return (
-    <div className="px-4 py-3 hover:bg-white/[0.02] transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center">
-      {/* Mobile: single row layout */}
+    <div className="px-4 py-3 hover:bg-white/[0.02] transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center">
       <div className="flex items-center justify-between gap-3 lg:contents">
         {/* Nombre + DNI */}
         <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex lg:items-center lg:gap-3">
@@ -186,8 +223,10 @@ function MemberRow({
           </div>
         </div>
 
-        {/* Mobile right: status + arrow */}
         <div className="flex items-center gap-2 flex-shrink-0 lg:contents">
+          {/* N° — desktop only column */}
+          <span className="hidden lg:block font-mono text-xs text-slate-400">{member.member_number}</span>
+
           {/* Estado REPROCANN */}
           <div className="flex items-center gap-2">
             <StatusBadge status={member.reprocann_status as ReprocannStatus} />
@@ -203,6 +242,19 @@ function MemberRow({
             <Badge variant="outline" className="text-xs">
               {MEMBER_TYPE_LABELS[member.member_type] || member.member_type}
             </Badge>
+          </div>
+
+          {/* Cuota — hidden on mobile */}
+          <div className="hidden lg:block">
+            {paidThisMonth ? (
+              <Badge variant="outline" className="text-xs text-[#2DC814] border-[#2DC814]/30 bg-[#2DC814]/5">
+                Al día
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs text-amber-400 border-amber-700/40 bg-amber-950/20">
+                Pendiente
+              </Badge>
+            )}
           </div>
 
           {/* Acciones — desktop */}
@@ -227,7 +279,7 @@ function MemberRow({
             </Button>
           </div>
 
-          {/* Mobile: arrow to detail */}
+          {/* Mobile: arrow */}
           <Link href={`/socios/${member.id}`} className="lg:hidden">
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500">
               <ChevronRight className="w-4 h-4" />

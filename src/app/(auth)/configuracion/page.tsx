@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2, ShoppingCart, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2, ShoppingCart, ToggleLeft, ToggleRight, Clock, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types/database'
 
@@ -202,7 +203,10 @@ export default function ConfiguracionPage() {
       {/* ── Sección 3: Dispensas y Checkout ── */}
       <CheckoutConfigSection isGerente={isGerente} />
 
-      {/* ── Sección 4: Operadores (solo gerente) ── */}
+      {/* ── Sección 4: Horas trabajadas (solo gerente) ── */}
+      {isGerente && <HorasSection />}
+
+      {/* ── Sección 5: Operadores (solo gerente) ── */}
       {isGerente && <OperatorsSection />}
     </div>
   )
@@ -339,6 +343,28 @@ function CheckoutConfigSection({ isGerente }: { isGerente: boolean }) {
             )}
           </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Horas ───────────────────────────────────────────────────────────────────
+function HorasSection() {
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="w-4 h-4 text-slate-500" />Horas trabajadas
+        </CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">Registro de sesiones y cálculo de sueldos por operador</p>
+      </CardHeader>
+      <CardContent>
+        <Link href="/configuracion/horas">
+          <Button variant="outline" className="gap-2 w-full sm:w-auto">
+            Ver registro de horas
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </Link>
       </CardContent>
     </Card>
   )

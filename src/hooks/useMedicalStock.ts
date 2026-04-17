@@ -15,6 +15,10 @@ export type MedicalStockLot = {
   notes: string | null
   created_at: string
   is_deleted: boolean
+  is_outsourced: boolean
+  outsourced_provider_name: string | null
+  cost_total: number | null
+  sale_price_total: number | null
 }
 
 const QUERY_KEY = 'medical_stock_lots'

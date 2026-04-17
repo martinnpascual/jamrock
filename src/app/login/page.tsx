@@ -32,6 +32,9 @@ function LoginForm() {
       return
     }
 
+    // Registrar inicio de sesión de trabajo (fire-and-forget)
+    fetch('/api/work-sessions', { method: 'POST' }).catch(() => {})
+
     // Full page reload para que el middleware lea los cookies de sesión correctamente
     window.location.href = '/dashboard'
   }

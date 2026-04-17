@@ -75,6 +75,26 @@ export function useCreatePayment() {
   })
 }
 
+// Returns a Set of member_ids that paid cuota this calendar month
+export function useMonthlyPaymentStatus() {
+  return useQuery({
+    queryKey: [QUERY_KEY, 'monthly_status'],
+    queryFn: async (): Promise<Set<string>> => {
+      const supabase = createClient()
+      const now = new Date()
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const { data } = await supabase
+        .from('payments')
+        .select('member_id')
+        .eq('is_deleted', false)
+        .gte('created_at', firstOfMonth)
+        .or('concept.eq.cuota,concept.eq.cuota_mensual')
+      return new Set((data ?? []).map((p) => p.member_id))
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useDeletePayment() {
   const queryClient = useQueryClient()
   return useMutation({

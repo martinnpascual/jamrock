@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { genetics, initial_grams, cost_per_gram, price_per_gram, lot_date, notes } = parsed.data
+  const {
+    genetics, initial_grams, cost_per_gram, price_per_gram, lot_date, notes,
+    is_outsourced, outsourced_provider_name, cost_total, sale_price_total,
+  } = parsed.data
 
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -46,11 +49,15 @@ export async function POST(request: NextRequest) {
     .insert({
       genetics,
       initial_grams,
-      current_grams: initial_grams, // arranca lleno
+      current_grams: initial_grams,
       cost_per_gram: cost_per_gram ?? null,
       price_per_gram: price_per_gram ?? 0,
       lot_date: lot_date || new Date().toISOString().split('T')[0],
       notes: notes || null,
+      is_outsourced: is_outsourced ?? false,
+      outsourced_provider_name: is_outsourced ? (outsourced_provider_name ?? null) : null,
+      cost_total: is_outsourced ? (cost_total ?? null) : null,
+      sale_price_total: is_outsourced ? (sale_price_total ?? null) : null,
       created_by: user.id,
     })
     .select()

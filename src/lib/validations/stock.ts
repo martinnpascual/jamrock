@@ -17,6 +17,11 @@ export const stockLotSchema = z.object({
     .default(0),
   lot_date: z.string().optional().or(z.literal('')),
   notes: z.string().max(500).optional().or(z.literal('')),
+  // Tercerización
+  is_outsourced: z.boolean().default(false),
+  outsourced_provider_name: z.string().max(200).optional().nullable(),
+  cost_total: z.coerce.number().nonnegative().optional().nullable(),
+  sale_price_total: z.coerce.number().nonnegative().optional().nullable(),
 })
 
 export type StockLotFormData = z.infer<typeof stockLotSchema>
