@@ -283,6 +283,18 @@ function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const netProfit = (salePriceTotal ?? 0) - (costTotal ?? 0)
   const margin = costTotal && costTotal > 0 ? ((netProfit / costTotal) * 100).toFixed(1) : null
 
+  // Per-gram profit estimate (visible for all lots)
+  const costPerGramRaw = watch('cost_per_gram')
+  const pricePerGramRaw = watch('price_per_gram')
+  const initialGramsRaw = watch('initial_grams')
+  const _cg = parseFloat(String(costPerGramRaw ?? 0)) || 0
+  const _pg = parseFloat(String(pricePerGramRaw ?? 0)) || 0
+  const _ig = parseFloat(String(initialGramsRaw ?? 0)) || 0
+  const profitPerGram = _pg - _cg
+  const totalProfitEstim = profitPerGram * _ig
+  const marginPerGram = _cg > 0 ? ((profitPerGram / _cg) * 100).toFixed(1) : null
+  const showProfitEstim = _cg > 0 && _pg > 0 && _ig > 0
+
   async function onSubmit(data: StockLotFormData) {
     try {
       await createMutation.mutateAsync({ ...data, is_outsourced: isOutsourced })
@@ -340,6 +352,26 @@ function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void })
               {errors.price_per_gram && <p className="text-xs text-red-500">{errors.price_per_gram.message}</p>}
             </div>
           </div>
+
+          {/* Ganancia estimada en tiempo real */}
+          {showProfitEstim && (
+            <div className={cn(
+              'flex items-center justify-between px-3 py-2.5 rounded-lg text-sm border',
+              profitPerGram >= 0
+                ? 'bg-[#2DC814]/5 border-[#2DC814]/20'
+                : 'bg-red-950/30 border-red-900/30'
+            )}>
+              <span className="text-slate-400 text-xs">
+                Ganancia estimada · {_ig.toFixed(0)}g × ${profitPerGram.toLocaleString('es-AR')}/g
+              </span>
+              <div className={cn('font-semibold', profitPerGram >= 0 ? 'text-[#2DC814]' : 'text-red-400')}>
+                ${totalProfitEstim.toLocaleString('es-AR')}
+                {marginPerGram && (
+                  <span className="text-xs ml-2 opacity-70">({marginPerGram}%)</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Fecha del lote</Label>
