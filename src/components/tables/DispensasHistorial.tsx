@@ -174,7 +174,7 @@ export function DispensasHistorial() {
   const todayDispensations = dispensations.filter(
     (d) => d.created_at.startsWith(today) && d.type === 'normal'
   )
-  const todayGrams = todayDispensations.reduce((sum, d) => sum + (d.quantity_grams ?? 0), 0)
+  const todayGrams = todayDispensations.reduce((sum, d) => sum + parseFloat(String(d.quantity_grams ?? 0)), 0)
 
   function openVoidDialog(d: DispensationWithMember) {
     setVoidTarget(d); setVoidReason(''); setVoidError(null)
@@ -367,7 +367,7 @@ function buildPriceTooltip(d: DispensationWithMember): string {
   if (!d.total_amount || d.total_amount <= 0) return ''
   const lines: string[] = []
   if (d.price_per_gram && d.price_per_gram > 0) {
-    lines.push(`${d.quantity_grams}g × ${ARS(d.price_per_gram)}/g = ${ARS(d.subtotal ?? d.total_amount)}`)
+    lines.push(`${parseFloat(String(d.quantity_grams))}g × ${ARS(d.price_per_gram)}/g = ${ARS(d.subtotal ?? d.total_amount)}`)
   }
   if (d.discount_percent && d.discount_percent > 0) {
     lines.push(`Desc: ${d.discount_percent}% (-${ARS(d.discount_amount ?? 0)})`)
@@ -426,7 +426,7 @@ function DispensationRow({
           <span className="hidden lg:block text-sm text-slate-300">{d.genetics}</span>
 
           <span className={cn('text-sm font-bold tabular-nums', isAnulacion ? 'text-red-400' : 'text-slate-100')}>
-            {isAnulacion ? '-' : ''}{d.quantity_grams}g
+            {isAnulacion ? '-' : ''}{parseFloat(String(d.quantity_grams))}g
           </span>
 
           <span className="hidden lg:block text-sm tabular-nums" title={buildPriceTooltip(d)}>
