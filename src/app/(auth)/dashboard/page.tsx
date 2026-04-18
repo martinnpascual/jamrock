@@ -140,16 +140,16 @@ export default async function DashboardPage() {
           title="Dispensas hoy"
           value={dispensasHoyRes.count ?? 0}
           icon={Syringe}
-          color="text-sky-400"
-          bg="bg-sky-900/30"
+          color="text-[#2DC814]"
+          bg="bg-[#2DC814]/10"
           href="/dispensas"
         />
         <KPICard
           title="Solicitudes"
           value={solicitudesRes.count ?? 0}
           icon={ClipboardList}
-          color="text-amber-400"
-          bg="bg-amber-900/30"
+          color={(solicitudesRes.count ?? 0) > 0 ? 'text-amber-400' : 'text-[#2DC814]'}
+          bg={(solicitudesRes.count ?? 0) > 0 ? 'bg-amber-900/30' : 'bg-[#2DC814]/10'}
           href="/solicitudes"
           badge={(solicitudesRes.count ?? 0) > 0}
         />
@@ -157,8 +157,8 @@ export default async function DashboardPage() {
           title="REPROCANN vencidos"
           value={sociosVencidosRes.count ?? 0}
           icon={AlertTriangle}
-          color="text-red-400"
-          bg="bg-red-950/50"
+          color={(sociosVencidosRes.count ?? 0) > 0 ? 'text-red-400' : 'text-[#2DC814]'}
+          bg={(sociosVencidosRes.count ?? 0) > 0 ? 'bg-red-950/50' : 'bg-[#2DC814]/10'}
           href="/socios?status=vencido"
           badge={(sociosVencidosRes.count ?? 0) > 0}
         />
@@ -167,8 +167,8 @@ export default async function DashboardPage() {
             title="Cuentas en deuda"
             value={cuentasEnDeudaRes.count ?? 0}
             icon={ArrowDownUp}
-            color="text-violet-400"
-            bg="bg-violet-900/30"
+            color={(cuentasEnDeudaRes.count ?? 0) > 0 ? 'text-amber-400' : 'text-[#2DC814]'}
+            bg={(cuentasEnDeudaRes.count ?? 0) > 0 ? 'bg-amber-900/30' : 'bg-[#2DC814]/10'}
             href="/cuentas-corrientes?balance_status=negative"
             badge={(cuentasEnDeudaRes.count ?? 0) > 0}
           />
@@ -178,8 +178,8 @@ export default async function DashboardPage() {
             title="Ventas del día"
             amount={ventasHoyTotal}
             icon={ShoppingCart}
-            color="text-emerald-400"
-            bg="bg-emerald-900/30"
+            color="text-[#2DC814]"
+            bg="bg-[#2DC814]/10"
             href="/dispensas"
           />
         )}

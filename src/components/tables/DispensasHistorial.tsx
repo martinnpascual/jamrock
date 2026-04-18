@@ -26,8 +26,11 @@ import { Search, Plus, Syringe, Lock, XCircle } from 'lucide-react'
 import type { ReprocannStatus } from '@/types/database'
 import { cn } from '@/lib/utils'
 
-const ARS = (n: number) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+const ARS = (n: number | string | null | undefined): string => {
+  const val = parseFloat(String(n ?? 0))
+  if (isNaN(val)) return '—'
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val)
+}
 
 type PaymentStatus = 'sin_cargo' | 'pagado' | 'fiado' | null | undefined
 

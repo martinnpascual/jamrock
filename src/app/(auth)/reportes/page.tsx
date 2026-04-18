@@ -11,7 +11,11 @@ import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/utils'
 
 type ReportType = 'dispensas' | 'socios' | 'financiero' | 'stock' | 'caja' | 'rentabilidad' | 'horas'
-const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+const ARS = (n: number | string | null | undefined): string => {
+  const val = parseFloat(String(n ?? 0))
+  if (isNaN(val)) return '—'
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val)
+}
 function formatMinutes(min: number): string {
   const h = Math.floor(min / 60); const m = min % 60
   if (h === 0) return `${m}m`; if (m === 0) return `${h}h`; return `${h}h ${m}m`
@@ -297,22 +301,26 @@ export default function ReportesPage() {
       </div>
 
       {/* Selector de reporte */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {REPORTS.map(({ id, label, Icon, desc }) => (
           <button
             key={id}
             onClick={() => setType(id)}
             className={cn(
-              'text-left p-4 rounded-xl border-2 transition-all',
-              type === id ? 'border-[#2DC814]/50 bg-[#2DC814]/5' : 'border-white/[0.06] bg-[#111111] hover:border-white/[0.12]'
+              'text-left p-4 rounded-xl border-2 transition-all group',
+              type === id
+                ? 'border-[#2DC814]/50 bg-[#2DC814]/5 shadow-sm shadow-[#2DC814]/10'
+                : 'border-white/[0.06] bg-[#111111] hover:border-white/[0.15] hover:bg-white/[0.03]'
             )}
           >
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2',
-              type === id ? 'bg-[#2DC814]/15' : 'bg-white/5')}>
-              <Icon className={cn('w-4 h-4', type === id ? 'text-[#2DC814]' : 'text-slate-500')} />
+            <div className={cn(
+              'w-9 h-9 rounded-lg flex items-center justify-center mb-3 transition-all',
+              type === id ? 'bg-[#2DC814]/20' : 'bg-white/[0.04] group-hover:bg-white/[0.07]'
+            )}>
+              <Icon className={cn('w-4 h-4', type === id ? 'text-[#2DC814]' : 'text-slate-400')} />
             </div>
-            <p className={cn('text-sm font-semibold', type === id ? 'text-[#2DC814]' : 'text-slate-200')}>{label}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+            <p className={cn('text-sm font-semibold leading-tight', type === id ? 'text-[#2DC814]' : 'text-slate-200')}>{label}</p>
+            <p className="text-xs text-slate-500 mt-1 leading-snug">{desc}</p>
           </button>
         ))}
       </div>
