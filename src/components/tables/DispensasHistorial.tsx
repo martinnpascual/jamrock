@@ -436,7 +436,7 @@ function DispensationRow({
               ) : (
                 <span className="text-green-400 font-medium">
                   {ARS(d.total_amount!)}
-                  {d.discount_percent && d.discount_percent > 0 && <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>}
+                  {(d.discount_percent ?? 0) > 0 && <span className="ml-1 text-xs text-amber-400">-{d.discount_percent}%</span>}
                 </span>
               )
             ) : <span className="text-gray-500">—</span>}
