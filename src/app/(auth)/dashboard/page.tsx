@@ -180,7 +180,7 @@ export default async function DashboardPage() {
             icon={ShoppingCart}
             color="text-[#2DC814]"
             bg="bg-[#2DC814]/10"
-            href="/dispensas"
+            href="/ventas"
           />
         )}
         {isGerente && fiadoHoyTotal > 0 && (

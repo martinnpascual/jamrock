@@ -95,7 +95,13 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
         </Button>
-        <Button variant="outline" className="h-11 px-3 text-slate-400" title="Escanear QR">
+        <Button
+          variant="outline"
+          className="h-11 px-3 text-slate-400 cursor-not-allowed opacity-50"
+          title="Escáner QR — próximamente"
+          disabled
+          type="button"
+        >
           <QrCode className="w-4 h-4" />
         </Button>
       </div>

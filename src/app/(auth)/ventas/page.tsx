@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema, saleSchema, CATEGORIES, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
@@ -22,7 +22,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw } from 'lucide-react'
+import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw, TrendingDown, Receipt } from 'lucide-react'
+import { useCashExpenses, useCreateExpense, useDeleteExpense, EXPENSE_CATEGORIES, type ExpenseCategory } from '@/hooks/useCashExpenses'
 import { cn } from '@/lib/utils'
 
 type Tab = 'ventas' | 'productos' | 'caja'
@@ -59,8 +60,10 @@ export default function VentasPage() {
   )
 }
 
+type DateRangeFilter = 'hoy' | 'semana' | 'mes'
+
 function VentasTab({ isGerente }: { isGerente: boolean }) {
-  const { data: sales = [], isLoading } = useSales(100)
+  const { data: sales = [], isLoading } = useSales(500)
   const { data: products = [] } = useProducts()
   const { data: members = [] } = useMembers()
   const createSale = useCreateSale()
@@ -68,9 +71,27 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const [open, setOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [confirmDeleteSale, setConfirmDeleteSale] = useState<{ id: string; name: string } | null>(null)
+  const [dateFilter, setDateFilter] = useState<DateRangeFilter>('hoy')
   const today = new Date().toISOString().split('T')[0]
+
+  const filteredSales = useMemo(() => {
+    const now = new Date()
+    let cutoff: Date
+    if (dateFilter === 'hoy') {
+      cutoff = new Date(today + 'T00:00:00')
+    } else if (dateFilter === 'semana') {
+      cutoff = new Date(now)
+      cutoff.setDate(now.getDate() - 7)
+    } else {
+      cutoff = new Date(now)
+      cutoff.setDate(now.getDate() - 30)
+    }
+    return sales.filter(s => new Date(s.created_at) >= cutoff)
+  }, [sales, dateFilter, today])
+
   const todaySales = sales.filter(s => s.created_at.startsWith(today))
   const totalHoy = todaySales.reduce((s, x) => s + x.total, 0)
+  const filteredTotal = filteredSales.reduce((s, x) => s + x.total, 0)
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<SaleFormData>({
     resolver: zodResolver(saleSchema), defaultValues: { quantity: 1 },
   })
@@ -93,14 +114,42 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
         <div className="bg-sky-900/20 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Transacciones hoy</p><p className="text-2xl font-bold text-sky-400 mt-1">{todaySales.length}</p></div>
         <div className="bg-white/5 border border-white/[0.06] rounded-lg p-4"><p className="text-xs text-slate-500 font-medium">Total registros</p><p className="text-2xl font-bold text-slate-300 mt-1">{sales.length}</p></div>
       </div>
-      <div className="flex justify-end">
-        <Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10"><Plus className="w-4 h-4" />Nueva venta</Button>
+      {/* Filtro de rango + CTA */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/[0.06]">
+          {([['hoy', 'Hoy'], ['semana', 'Últimos 7 días'], ['mes', 'Últimos 30 días']] as [DateRangeFilter, string][]).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setDateFilter(val)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                dateFilter === val
+                  ? 'bg-[#151515] text-white shadow-sm border border-white/[0.06]'
+                  : 'text-slate-500 hover:text-slate-300'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          {filteredSales.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {filteredSales.length} ventas · <span className="text-[#2DC814] font-semibold">{ARS(filteredTotal)}</span>
+            </span>
+          )}
+          <Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10">
+            <Plus className="w-4 h-4" />Nueva venta
+          </Button>
+        </div>
       </div>
       {sales.length === 0
         ? <div className="flex flex-col items-center py-16"><ShoppingCart className="w-10 h-10 text-slate-300 mb-3" /><p className="text-sm text-slate-500">Sin ventas registradas</p></div>
+        : filteredSales.length === 0
+        ? <div className="flex flex-col items-center py-12"><ShoppingCart className="w-8 h-8 text-slate-600 mb-2" /><p className="text-sm text-slate-500">Sin ventas en este período</p></div>
         : (
           <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm divide-y divide-white/[0.04]">
-            {sales.map(s => {
+            {filteredSales.map(s => {
               const prod = (Array.isArray(s.commercial_products) ? s.commercial_products[0] : s.commercial_products) as { name: string } | null
               const mem = (Array.isArray(s.members) ? s.members[0] : s.members) as { first_name: string; last_name: string } | null
               return (
@@ -276,6 +325,81 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   )
 }
 
+// ── ShiftRegisterCard — extraído fuera de CajaTab para evitar recreación en cada render ──
+
+interface ShiftRegisterCardProps {
+  reg: CashRegister
+  shift: string
+  isGerente: boolean
+  onClose: (shift: 'mañana' | 'tarde') => void
+  onReopen: (reg: { id: string; shift: string }) => void
+}
+
+function ShiftRegisterCard({ reg, shift, isGerente, onClose, onReopen }: ShiftRegisterCardProps) {
+  const isClosed = reg.status === 'cerrada'
+  const isOpen = reg.status === 'abierta'
+  const ShiftIcon = shift === 'mañana' ? Sun : Moon
+  return (
+    <div className={cn('bg-[#111111] border rounded-xl p-5 shadow-sm', isOpen ? 'border-[#2DC814]/30' : 'border-white/[0.06]')}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <ShiftIcon className={cn('w-4 h-4', isOpen ? 'text-[#2DC814]' : 'text-slate-400')} />
+          <span className="text-sm font-semibold text-slate-200 capitalize">Turno {shift}</span>
+          <Badge variant="outline" className={cn('text-xs', isOpen ? 'text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10' : 'text-slate-500 border-white/10')}>
+            {isOpen ? 'Abierta' : 'Cerrada'}
+          </Badge>
+        </div>
+        {isOpen && isGerente && (
+          <Button
+            onClick={() => onClose(shift as 'mañana' | 'tarde')}
+            className="h-9 gap-1.5 bg-red-600 hover:bg-red-700 text-white font-bold min-h-[44px]"
+            size="sm"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            Cerrar caja
+          </Button>
+        )}
+        {isClosed && isGerente && (
+          <Button
+            onClick={() => onReopen({ id: reg.id, shift })}
+            variant="outline"
+            className="h-9 gap-1.5 border-amber-600/50 text-amber-400 hover:bg-amber-950/30 font-bold min-h-[44px]"
+            size="sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reabrir
+          </Button>
+        )}
+      </div>
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-slate-400">Esperado (efectivo)</span>
+          <span className="font-semibold text-slate-200">{ARS(Number(reg.expected_total))}</span>
+        </div>
+        {isClosed && (
+          <>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Contado</span>
+              <span className="font-medium text-slate-200">{ARS(reg.actual_total ?? 0)}</span>
+            </div>
+            <div className="h-px bg-white/[0.05]" />
+            <div className="flex justify-between">
+              <span className="text-sm font-semibold text-slate-300">Diferencia</span>
+              <span className={cn('text-sm font-bold', (reg.difference ?? 0) === 0 ? 'text-[#2DC814]' : (reg.difference ?? 0) > 0 ? 'text-sky-400' : 'text-red-400')}>
+                {(reg.difference ?? 0) >= 0 ? '+' : ''}{ARS(reg.difference ?? 0)}
+              </span>
+            </div>
+            {reg.closed_at && (
+              <p className="text-xs text-slate-500">Cerrada: {new Date(reg.closed_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
+            )}
+            {reg.notes && <p className="text-xs text-slate-400 italic">&ldquo;{reg.notes}&rdquo;</p>}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ProductCard({ product: p, isGerente, onDelete }: { product: Product; isGerente: boolean; onDelete: () => void }) {
   const isLow = p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold
   const isEmpty = p.stock_quantity === 0
@@ -300,6 +424,39 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
   const openReg = useOpenCashRegister()
   const closeReg = useCloseCashRegister()
   const reopenReg = useReopenCashRegister()
+
+  // Egresos
+  const { data: expensesData } = useCashExpenses()
+  const createExpense = useCreateExpense()
+  const deleteExpense = useDeleteExpense()
+  const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('otro')
+  const [expenseDescription, setExpenseDescription] = useState('')
+  const [expenseAmount, setExpenseAmount] = useState<number>(0)
+  const [expenseNotes, setExpenseNotes] = useState('')
+  const [expenseError, setExpenseError] = useState('')
+  const [confirmDeleteExpense, setConfirmDeleteExpense] = useState<{ id: string; desc: string } | null>(null)
+
+  async function onCreateExpense() {
+    setExpenseError('')
+    if (!expenseDescription.trim()) { setExpenseError('Ingresá una descripción'); return }
+    if (expenseAmount <= 0) { setExpenseError('El monto debe ser mayor a 0'); return }
+    try {
+      await createExpense.mutateAsync({
+        category: expenseCategory,
+        description: expenseDescription.trim(),
+        amount: expenseAmount,
+        notes: expenseNotes.trim() || undefined,
+      })
+      setExpenseDescription('')
+      setExpenseAmount(0)
+      setExpenseNotes('')
+      setExpenseCategory('otro')
+      setShowExpenseForm(false)
+    } catch (err) {
+      setExpenseError(err instanceof Error ? err.message : 'Error al registrar egreso')
+    }
+  }
 
   // Shift selection for opening
   const autoShift = new Date().getHours() < 14 ? 'mañana' : 'tarde'
@@ -385,71 +542,6 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
     ...(canOpenAfternoon ? ['tarde' as const] : []),
   ]
 
-  function ShiftRegisterCard({ reg, shift }: { reg: CashRegister; shift: string }) {
-    const isClosed = reg.status === 'cerrada'
-    const isOpen = reg.status === 'abierta'
-    const ShiftIcon = shift === 'mañana' ? Sun : Moon
-    return (
-      <div className={cn('bg-[#111111] border rounded-xl p-5 shadow-sm', isOpen ? 'border-[#2DC814]/30' : 'border-white/[0.06]')}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <ShiftIcon className={cn('w-4 h-4', isOpen ? 'text-[#2DC814]' : 'text-slate-400')} />
-            <span className="text-sm font-semibold text-slate-200 capitalize">Turno {shift}</span>
-            <Badge variant="outline" className={cn('text-xs', isOpen ? 'text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10' : 'text-slate-500 border-white/10')}>
-              {isOpen ? 'Abierta' : 'Cerrada'}
-            </Badge>
-          </div>
-          {isOpen && isGerente && (
-            <Button
-              onClick={() => { setClosingShift(shift as 'mañana' | 'tarde'); setCloseActualTotal(0); setCloseNotes(''); setCloseError('') }}
-              className="h-9 gap-1.5 bg-red-600 hover:bg-red-700 text-white font-bold min-h-[44px]"
-              size="sm"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              Cerrar caja
-            </Button>
-          )}
-          {isClosed && isGerente && (
-            <Button
-              onClick={() => setReopeningReg({ id: reg.id, shift })}
-              variant="outline"
-              className="h-9 gap-1.5 border-amber-600/50 text-amber-400 hover:bg-amber-950/30 font-bold min-h-[44px]"
-              size="sm"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reabrir
-            </Button>
-          )}
-        </div>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Esperado (efectivo)</span>
-            <span className="font-semibold text-slate-200">{ARS(Number(reg.expected_total))}</span>
-          </div>
-          {isClosed && (
-            <>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Contado</span>
-                <span className="font-medium text-slate-200">{ARS(reg.actual_total ?? 0)}</span>
-              </div>
-              <div className="h-px bg-white/[0.05]" />
-              <div className="flex justify-between">
-                <span className="text-sm font-semibold text-slate-300">Diferencia</span>
-                <span className={cn('text-sm font-bold', (reg.difference ?? 0) === 0 ? 'text-[#2DC814]' : (reg.difference ?? 0) > 0 ? 'text-sky-400' : 'text-red-400')}>
-                  {(reg.difference ?? 0) >= 0 ? '+' : ''}{ARS(reg.difference ?? 0)}
-                </span>
-              </div>
-              {reg.closed_at && (
-                <p className="text-xs text-slate-500">Cerrada: {new Date(reg.closed_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
-              )}
-              {reg.notes && <p className="text-xs text-slate-400 italic">&ldquo;{reg.notes}&rdquo;</p>}
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-5 max-w-2xl">
       {/* Header con fecha */}
@@ -502,8 +594,24 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
       {/* Si hay registro(s), mostrar cards por turno */}
       {hasAnyRegister && (
         <div className="space-y-4">
-          {summary.morning && <ShiftRegisterCard reg={summary.morning} shift="mañana" />}
-          {summary.afternoon && <ShiftRegisterCard reg={summary.afternoon} shift="tarde" />}
+          {summary.morning && (
+            <ShiftRegisterCard
+              reg={summary.morning}
+              shift="mañana"
+              isGerente={isGerente}
+              onClose={(s) => { setClosingShift(s); setCloseActualTotal(0); setCloseNotes(''); setCloseError('') }}
+              onReopen={setReopeningReg}
+            />
+          )}
+          {summary.afternoon && (
+            <ShiftRegisterCard
+              reg={summary.afternoon}
+              shift="tarde"
+              isGerente={isGerente}
+              onClose={(s) => { setClosingShift(s); setCloseActualTotal(0); setCloseNotes(''); setCloseError('') }}
+              onReopen={setReopeningReg}
+            />
+          )}
 
           {/* Botón para abrir el turno pendiente (si falta uno) */}
           {availableShifts.length > 0 && !bothClosed && (
@@ -656,6 +764,158 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Egresos del día ─────────────────────────────────────── */}
+      <div className="bg-[#111111] border border-white/[0.06] rounded-lg p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingDown className="w-4 h-4 text-red-400" />
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Egresos del día</p>
+            {(expensesData?.expenses?.length ?? 0) > 0 && (
+              <span className="text-xs text-red-400 font-bold">{ARS(expensesData?.total ?? 0)}</span>
+            )}
+          </div>
+          {isGerente && (
+            <Button
+              size="sm"
+              onClick={() => setShowExpenseForm(true)}
+              className="h-8 gap-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-300 border border-red-900/40 font-medium min-h-[44px] text-xs"
+              variant="outline"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Nuevo egreso
+            </Button>
+          )}
+        </div>
+
+        {(expensesData?.expenses?.length ?? 0) === 0 ? (
+          <p className="text-xs text-slate-600 text-center py-2">Sin egresos registrados hoy</p>
+        ) : (
+          <div className="space-y-1.5">
+            {expensesData!.expenses.map(exp => {
+              const cat = EXPENSE_CATEGORIES.find(c => c.value === exp.category)
+              return (
+                <div key={exp.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.04] group">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-slate-300 truncate">{exp.description}</p>
+                    <p className="text-xs text-slate-600">{cat?.label ?? exp.category} · {new Date(exp.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm font-bold text-red-400">−{ARS(exp.amount)}</span>
+                    {isGerente && (
+                      <button
+                        onClick={() => setConfirmDeleteExpense({ id: exp.id, desc: exp.description })}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex justify-between pt-1 border-t border-white/[0.05]">
+              <span className="text-xs text-slate-500">Total egresos</span>
+              <span className="text-sm font-bold text-red-400">−{ARS(expensesData?.total ?? 0)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dialog: Nuevo egreso */}
+      <Dialog open={showExpenseForm} onOpenChange={o => { if (!o) { setExpenseError(''); setShowExpenseForm(false) } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Receipt className="w-4 h-4 text-red-400" />Registrar egreso</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Categoría *</Label>
+              <Select value={expenseCategory} onValueChange={v => setExpenseCategory(v as ExpenseCategory)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descripción *</Label>
+              <Input
+                placeholder="Ej: Sueldo Juan, Factura luz mayo..."
+                value={expenseDescription}
+                onChange={e => setExpenseDescription(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Monto ($) *</Label>
+              <Input
+                type="number"
+                min={0}
+                step={100}
+                placeholder="0"
+                value={expenseAmount || ''}
+                onChange={e => setExpenseAmount(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas <span className="text-slate-500 font-normal">(opcional)</span></Label>
+              <Textarea
+                placeholder="Observaciones adicionales..."
+                rows={2}
+                value={expenseNotes}
+                onChange={e => setExpenseNotes(e.target.value)}
+              />
+            </div>
+            {expenseError && (
+              <div className="flex items-center gap-2 bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">{expenseError}</p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowExpenseForm(false)} disabled={createExpense.isPending}>Cancelar</Button>
+              <Button
+                onClick={onCreateExpense}
+                disabled={createExpense.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold min-h-[44px]"
+              >
+                {createExpense.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrando...</> : 'Registrar egreso'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog: Confirmar eliminar egreso */}
+      <AlertDialog open={!!confirmDeleteExpense} onOpenChange={o => { if (!o) setConfirmDeleteExpense(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar egreso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés eliminar el egreso &ldquo;<strong className="text-slate-200">{confirmDeleteExpense?.desc}</strong>&rdquo;?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteExpense.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!confirmDeleteExpense) return
+                await deleteExpense.mutateAsync(confirmDeleteExpense.id)
+                setConfirmDeleteExpense(null)
+              }}
+              disabled={deleteExpense.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              {deleteExpense.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {openReg.error && (
         <p className="text-sm text-red-400 text-center">{(openReg.error as Error).message}</p>

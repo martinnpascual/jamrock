@@ -91,8 +91,14 @@ export function Step4Payment({
         return amountCash >= total
       case 'transferencia':
         return amountTransfer >= total
-      case 'mixto':
-        return (amountCash + amountTransfer + amountCC) >= total
+      case 'mixto': {
+        if ((amountCash + amountTransfer + amountCC) < total) return false
+        // Si hay parte CC, requiere elegir modo
+        if (amountCC > 0 && !ccMode) return false
+        // Si es saldo, requiere que el socio tenga saldo suficiente
+        if (amountCC > 0 && ccMode === 'saldo' && memberCCBalance < amountCC) return false
+        return true
+      }
       case 'cuenta_corriente':
         if (!ccMode) return false
         if (ccMode === 'saldo' && memberCCBalance < total) return false
@@ -102,28 +108,11 @@ export function Step4Payment({
     }
   }
 
-  // Determinar el método real que se enviará a la API
-  function getActualMethod(): PaymentMethod {
-    if (paymentMethod !== 'mixto') return paymentMethod!
-    // Si se usaron los 3, es mixto_3. Si solo 2 (cash+transfer), es mixto clásico
-    const nonZero = [amountCash, amountTransfer, amountCC].filter(v => v > 0).length
-    if (nonZero >= 2 && amountCC > 0) return 'mixto_3'
-    if (amountCC > 0 && nonZero === 1) return 'cuenta_corriente'
-    if (amountCash > 0 && amountTransfer === 0 && amountCC === 0) return 'efectivo'
-    if (amountTransfer > 0 && amountCash === 0 && amountCC === 0) return 'transferencia'
-    return 'mixto'
-  }
-
   function handleConfirm() {
-    // Remap payment method based on actual amounts
-    const actualMethod = getActualMethod()
-    if (actualMethod !== paymentMethod) {
-      onSetPaymentMethod(actualMethod)
-      // Give state a tick to update, then confirm
-      setTimeout(() => onConfirm(), 0)
-    } else {
-      onConfirm()
-    }
+    // No remapear el método aquí — buildPaymentPayload en useCheckout lo resuelve
+    // internamente según los montos reales. Llamar setPaymentMethod acá resetea los
+    // montos a 0 y rompe el checkout.
+    onConfirm()
   }
 
   // Build confirm button label
@@ -305,6 +294,30 @@ export function Step4Payment({
             )}
           </div>
 
+          {/* Acciones rápidas: cargar resto como deuda / usar saldo */}
+          {allowCredit && remaining > 0 && (amountCash > 0 || amountTransfer > 0) && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onSetCC(remaining)}
+                className="flex-1 text-xs px-3 py-2 rounded-lg border border-amber-800/40 bg-amber-950/20 text-amber-300 hover:bg-amber-950/40 transition-colors text-left"
+              >
+                <span className="font-semibold">+ Cargar resto como deuda</span>
+                <span className="ml-1 text-amber-400/70">{ARS(remaining)} → CC fiado</span>
+              </button>
+              {showCCBalance && memberCCBalance > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onSetCC(Math.min(memberCCBalance, remaining))}
+                  className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#2DC814]/30 bg-[#2DC814]/5 text-[#2DC814]/80 hover:bg-[#2DC814]/10 transition-colors text-left"
+                >
+                  <span className="font-semibold">← Usar saldo CC</span>
+                  <span className="ml-1 text-[#2DC814]/60">{ARS(Math.min(memberCCBalance, remaining))}</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Detalle de transferencia (si hay monto) */}
           {amountTransfer > 0 && (
             <div className="space-y-2 bg-white/[0.02] border border-white/[0.06] rounded-lg p-3">
@@ -333,21 +346,76 @@ export function Step4Payment({
             </div>
           )}
 
-          {/* Advertencia CC */}
+          {/* Toggle fiado/saldo para la parte CC */}
           {amountCC > 0 && (
-            <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg p-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-300/80">
-                <p>Se cargarán <strong className="text-amber-300">{ARS(amountCC)}</strong> a la cuenta corriente del socio.</p>
-                {showCCBalance && (
-                  <p className="mt-1 text-slate-500">
-                    Saldo actual: {ARS(memberCCBalance)} → Nuevo saldo: <span className={cn(
-                      'font-semibold',
-                      (memberCCBalance - amountCC) < 0 ? 'text-red-400' : 'text-[#2DC814]'
-                    )}>{ARS(memberCCBalance - amountCC)}</span>
+            <div className="space-y-2 bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+              <p className="text-xs font-medium text-slate-400">Parte CC — ¿cómo se maneja?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSetCCMode('fiado')}
+                  className={cn(
+                    'flex flex-col items-start gap-0.5 p-2.5 rounded-lg border text-left transition-all',
+                    ccMode === 'fiado'
+                      ? 'bg-amber-500/10 border-amber-500/50'
+                      : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04]'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <TrendingDown className={cn('w-3.5 h-3.5', ccMode === 'fiado' ? 'text-amber-400' : 'text-slate-500')} />
+                    <span className={cn('text-xs font-semibold', ccMode === 'fiado' ? 'text-amber-300' : 'text-slate-400')}>
+                      Fiado
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Queda como deuda</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetCCMode('saldo')}
+                  disabled={memberCCBalance < amountCC}
+                  className={cn(
+                    'flex flex-col items-start gap-0.5 p-2.5 rounded-lg border text-left transition-all',
+                    ccMode === 'saldo'
+                      ? 'bg-[#2DC814]/10 border-[#2DC814]/40'
+                      : memberCCBalance < amountCC
+                        ? 'bg-white/[0.01] border-white/[0.03] opacity-50 cursor-not-allowed'
+                        : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04]'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className={cn('w-3.5 h-3.5', ccMode === 'saldo' ? 'text-[#2DC814]' : 'text-slate-500')} />
+                    <span className={cn('text-xs font-semibold', ccMode === 'saldo' ? 'text-[#2DC814]' : 'text-slate-400')}>
+                      Saldo a favor
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {memberCCBalance < amountCC
+                      ? `Saldo insuf. (${ARS(memberCCBalance)})`
+                      : 'Descontar del saldo'}
                   </p>
-                )}
+                </button>
               </div>
+
+              {/* Detalle según modo */}
+              {ccMode === 'fiado' && showCCBalance && (
+                <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-300/80">
+                    {ARS(amountCC)} queda como deuda. Saldo: {ARS(memberCCBalance)} → <span className={cn('font-semibold', (memberCCBalance - amountCC) < 0 ? 'text-red-400' : 'text-[#2DC814]')}>{ARS(memberCCBalance - amountCC)}</span>
+                  </p>
+                </div>
+              )}
+              {ccMode === 'saldo' && showCCBalance && (
+                <div className="flex items-start gap-2 bg-[#2DC814]/5 border border-[#2DC814]/20 rounded-lg px-3 py-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-[#2DC814] flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-[#2DC814]/80">
+                    {ARS(amountCC)} se descuenta del saldo. Nuevo saldo: <span className="font-semibold">{ARS(memberCCBalance - amountCC)}</span>
+                  </p>
+                </div>
+              )}
+              {!ccMode && (
+                <p className="text-xs text-amber-400/70 px-1">↑ Seleccioná cómo manejar la parte CC</p>
+              )}
             </div>
           )}
 
@@ -384,12 +452,12 @@ export function Step4Payment({
             {/* Saldo */}
             <button
               onClick={() => onSetCCMode('saldo')}
-              disabled={memberCCBalance < total}
+              disabled={memberCCBalance <= 0}
               className={cn(
                 'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all min-h-[44px]',
                 ccMode === 'saldo'
                   ? 'bg-[#2DC814]/10 border-[#2DC814]/50 text-slate-100'
-                  : memberCCBalance < total
+                  : memberCCBalance <= 0
                     ? 'bg-white/[0.01] border-white/[0.04] text-slate-600 cursor-not-allowed opacity-60'
                     : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'
               )}
@@ -399,7 +467,11 @@ export function Step4Payment({
                 Saldo a favor
               </p>
               <p className="text-xs text-slate-500">
-                {memberCCBalance < total ? 'Saldo insuficiente' : 'Usar saldo disponible'}
+                {memberCCBalance <= 0
+                  ? 'Sin saldo disponible'
+                  : memberCCBalance < total
+                    ? `Saldo parcial: ${ARS(memberCCBalance)}`
+                    : 'Usar saldo disponible'}
               </p>
             </button>
           </div>

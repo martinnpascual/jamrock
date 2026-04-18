@@ -39,6 +39,7 @@ export interface CheckoutResult {
   change_given:         number
   transfer_detail:      string | null
   cc_balance:           number
+  warnings?:            string[]
 }
 
 export type PaymentMethod = 'efectivo' | 'transferencia' | 'mixto' | 'mixto_3' | 'cuenta_corriente'
@@ -235,6 +236,12 @@ export function useCheckout() {
       return
     }
 
+    // Validar ccMode en mixto cuando hay parte CC
+    if (state.paymentMethod === 'mixto' && state.amountCC > 0 && !state.ccMode) {
+      setState(s => ({ ...s, error: 'Seleccioná si la parte de CC es fiado o saldo a favor' }))
+      return
+    }
+
     setState(s => ({ ...s, isProcessing: true, error: null }))
 
     const body = {
@@ -273,6 +280,7 @@ export function useCheckout() {
         result:       data.transaction as CheckoutResult,
         currentStep:  5,
       }))
+      // warnings ya vienen dentro de data.transaction
     } catch {
       setState(s => ({ ...s, isProcessing: false, error: 'Error de red. Intentá nuevamente.' }))
     }
@@ -324,7 +332,19 @@ function buildPaymentPayload(state: CheckoutState) {
     }
     : {}
 
-  switch (paymentMethod) {
+  // Resolver el método REAL desde los montos cuando el usuario está en modo mixto.
+  // Esto evita el bug donde handleConfirm llamaba a setPaymentMethod (que resetea
+  // todos los montos) antes de confirmar.
+  let resolvedMethod = paymentMethod
+  if (paymentMethod === 'mixto') {
+    const nonZero = [amountCash, amountTransfer, amountCC].filter(v => v > 0).length
+    if (nonZero >= 2 && amountCC > 0)       resolvedMethod = 'mixto_3'
+    else if (amountCC > 0 && nonZero === 1)  resolvedMethod = 'cuenta_corriente'
+    else if (amountCash > 0 && amountTransfer === 0 && amountCC === 0) resolvedMethod = 'efectivo'
+    else if (amountTransfer > 0 && amountCash === 0 && amountCC === 0) resolvedMethod = 'transferencia'
+  }
+
+  switch (resolvedMethod) {
     case 'efectivo':
       return { method: 'efectivo', amount_cash: amountCash, amount_transfer: 0 }
     case 'transferencia':
@@ -332,7 +352,7 @@ function buildPaymentPayload(state: CheckoutState) {
     case 'mixto':
       return { method: 'mixto', amount_cash: amountCash, amount_transfer: amountTransfer, ...transferFields }
     case 'mixto_3':
-      return { method: 'mixto_3', amount_cash: amountCash, amount_transfer: amountTransfer, amount_cc: amountCC, ...transferFields }
+      return { method: 'mixto_3', amount_cash: amountCash, amount_transfer: amountTransfer, amount_cc: amountCC, cc_mode: ccMode ?? 'fiado', ...transferFields }
     case 'cuenta_corriente':
       return { method: 'cuenta_corriente', cc_mode: ccMode ?? 'fiado' }
     default:

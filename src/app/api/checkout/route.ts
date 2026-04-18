@@ -238,12 +238,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1i. Extraer cc_mode para cuenta_corriente
-  const ccMode = payment.method === 'cuenta_corriente' && 'cc_mode' in payment
-    ? (payment.cc_mode as 'fiado' | 'saldo')
-    : 'fiado'
+  // 1i. Extraer cc_mode (cuenta_corriente o mixto_3 con parte CC)
+  const ccMode: 'fiado' | 'saldo' =
+    ('cc_mode' in payment && payment.cc_mode)
+      ? (payment.cc_mode as 'fiado' | 'saldo')
+      : 'fiado'
 
-  // 1j. Validar CC si hay monto fiado (mixto_3 con CC o cuenta_corriente puro)
+  // 1j. Validar CC si hay monto fiado/saldo (mixto_3 con CC o cuenta_corriente puro)
   if (payment.method === 'cuenta_corriente' || (payment.method === 'mixto_3' && amountCC > 0)) {
     const ccAmount = payment.method === 'cuenta_corriente' ? totalAmount : amountCC
     const { data: ccAccount } = await admin
@@ -254,11 +255,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     // Si es saldo, validar que el balance sea suficiente
-    if (payment.method === 'cuenta_corriente' && ccMode === 'saldo') {
+    if (ccMode === 'saldo') {
       const balance = ccAccount?.balance ?? 0
-      if (balance < totalAmount) {
+      if (balance < ccAmount) {
         return NextResponse.json(
-          { error: `Saldo insuficiente para cubrir el total. Saldo: $${balance}, Total: $${totalAmount}` },
+          { error: `Saldo insuficiente. Saldo disponible: $${balance}, necesario: $${ccAmount}` },
           { status: 422 }
         )
       }
@@ -276,14 +277,19 @@ export async function POST(request: NextRequest) {
   }
 
   // ── PASO 2: CREAR DISPENSAS ───────────────────────────────────────────────
-  const isFiado = payment.method === 'cuenta_corriente' && ccMode === 'fiado'
-  const isSaldo = payment.method === 'cuenta_corriente' && ccMode === 'saldo'
-  const isMixto3 = payment.method === 'mixto_3'
+  const isFiado   = payment.method === 'cuenta_corriente' && ccMode === 'fiado'
+  const isSaldo   = payment.method === 'cuenta_corriente' && ccMode === 'saldo'
+  const isMixto3  = payment.method === 'mixto_3'
+  // mixto_3 + saldo: el CC se descuenta de saldo existente → pagado completo
+  const isMixto3Saldo = isMixto3 && amountCC > 0 && ccMode === 'saldo'
+  const isMixto3Fiado = isMixto3 && amountCC > 0 && ccMode === 'fiado'
+
   const paymentStatusForDisp: 'sin_cargo' | 'pagado' | 'fiado' | 'parcial' =
-    totalAmount === 0 ? 'sin_cargo'
-    : isFiado ? 'fiado'
-    : isSaldo ? 'pagado'
-    : (isMixto3 && amountCC > 0) ? 'parcial'
+    totalAmount === 0      ? 'sin_cargo'
+    : isFiado              ? 'fiado'
+    : isSaldo              ? 'pagado'
+    : isMixto3Saldo        ? 'pagado'
+    : isMixto3Fiado        ? 'parcial'
     : 'pagado'
 
   const createdDispensations: { id: string; dispensation_number: string }[] = []
@@ -377,9 +383,9 @@ export async function POST(request: NextRequest) {
   // ── PASO 4: CC y PAGO ─────────────────────────────────────────────────────
   let paymentId: string | null = null
   let ccMovementId: string | null = null
-  let ccFiadoMovementId: string | null = null
   let changeGiven = 0
   let ccBalanceAfter = 0
+  const responseWarnings: string[] = []
 
   if (totalAmount > 0) {
     // Obtener o crear CC del socio
@@ -417,7 +423,11 @@ export async function POST(request: NextRequest) {
       : ''
     const debitDescription = `Dispensa: ${dispensasParts} — ${dispensasNumbers}${itemsDescription}`
 
-    const ccConcept = isSaldo ? 'checkout_saldo' : isFiado ? 'checkout_fiado' : 'checkout_deuda'
+    const ccConcept = isSaldo        ? 'checkout_saldo'
+      : isFiado       ? 'checkout_fiado'
+      : isMixto3Saldo ? 'checkout_saldo_parcial'
+      : isMixto3Fiado ? 'checkout_fiado_parcial'
+      : 'checkout_deuda'
 
     const { data: debitMovement, error: debitErr } = await admin
       .from('current_account_movements')
@@ -445,17 +455,32 @@ export async function POST(request: NextRequest) {
 
     // 4b. PAGO (si no es fiado ni saldo puro)
     if (!isFiado && !isSaldo) {
-      // Para mixto_3: la parte pagada es cash + transfer (sin CC)
-      const paidAmount = isMixto3 ? (amountCash + amountTransfer) : totalAmount
+      // Para mixto_3: paidAmount = cash + transfer (+ amountCC si es saldo, porque lo "pagó" con saldo)
+      // El CRÉDITO del trigger de payment debe cubrir toda la parte pagada para que el net sea correcto.
+      // mixto_3 fiado: paidAmount = cash + transfer → net CC = -amountCC (queda como deuda)
+      // mixto_3 saldo: paidAmount = cash + transfer + amountCC → net CC = -amountCC (se descuenta del saldo)
+      //   En ambos casos el net es idéntico gracias al DÉBITO(total) ya registrado en 4a.
+      //   NOTA: El step 4d (DÉBITO adicional) fue ELIMINADO porque causaba doble deuda.
+      const paidAmount = isMixto3Saldo
+        ? (amountCash + amountTransfer + amountCC)  // saldo: se "paga" todo incluyendo la parte CC
+        : isMixto3
+          ? (amountCash + amountTransfer)            // fiado: solo la parte en efectivo/transferencia
+          : totalAmount
+
       changeGiven = isMixto3
         ? Math.max(0, (amountCash + amountTransfer) - (totalAmount - amountCC))
         : Math.max(0, amountCash + amountTransfer - totalAmount)
 
       if (paidAmount > 0) {
+        const ccNote = isMixto3Fiado
+          ? ` — CC fiado: $${amountCC}`
+          : isMixto3Saldo
+            ? ` — CC saldo: $${amountCC} descontado de saldo a favor`
+            : ''
         const paymentNotes = `Dispensa: ${dispensasParts} — ${dispensasNumbers}` +
           (items.length > 0 ? ` + ${items.length} producto(s)` : '') +
           (changeGiven > 0 ? ` — Vuelto: $${changeGiven.toFixed(0)}` : '') +
-          (isMixto3 && amountCC > 0 ? ` — Fiado parcial: $${amountCC}` : '') +
+          ccNote +
           (transferDetail ? ` — Transf. detalle: ${transferDetail}` : '')
 
         const { data: newPayment, error: paymentErr } = await admin
@@ -483,7 +508,6 @@ export async function POST(request: NextRequest) {
       if (amountCash > 0) {
         const today = new Date().toISOString().split('T')[0]
 
-        // Buscar caja ABIERTA del día (la más reciente si hay 2 turnos)
         const { data: openReg } = await admin
           .from('cash_registers')
           .select('id, expected_total')
@@ -498,8 +522,12 @@ export async function POST(request: NextRequest) {
             .from('cash_registers')
             .update({ expected_total: Number(openReg.expected_total) + amountCash })
             .eq('id', openReg.id)
+        } else {
+          // No hay caja abierta — la dispensa se registra igual, pero el efectivo no se suma
+          responseWarnings.push(
+            `Se recibieron $${amountCash.toLocaleString('es-AR')} en efectivo pero no hay caja abierta. Abrí un turno de caja para registrar este ingreso.`
+          )
         }
-        // Si no hay caja abierta, el pago se registra igual pero no se suma a ninguna caja
       }
 
       // Actualizar balance after del débito (ahora que el payment trigger ya corrió)
@@ -510,45 +538,18 @@ export async function POST(request: NextRequest) {
         .single()
       if (updatedCC) ccBalanceAfter = updatedCC.balance
     }
-
-    // 4d. Si es mixto_3 con CC > 0: crear movimiento DÉBITO adicional por la parte fiada
-    if (isMixto3 && amountCC > 0) {
-      const cashDesc = amountCash > 0 ? `$${amountCash} efectivo` : ''
-      const transDesc = amountTransfer > 0 ? `$${amountTransfer} transferencia` : ''
-      const paidParts = [cashDesc, transDesc].filter(Boolean).join(' + ')
-
-      const { data: fiadoMov, error: fiadoErr } = await admin
-        .from('current_account_movements')
-        .insert({
-          account_id:    accountId,
-          movement_type: 'debito',
-          amount:        amountCC,
-          balance_after: 0,
-          concept:       'checkout_fiado_parcial',
-          description:   `Pago parcial fiado — $${amountCC} de $${totalAmount} total. Pagó ${paidParts}`,
-          source_type:   'manual',
-          source_id:     null,
-          created_by:    user.id,
-        })
-        .select('id, balance_after')
-        .single()
-
-      if (fiadoErr || !fiadoMov) {
-        console.error('checkout: error creating fiado parcial movement:', fiadoErr?.message)
-      } else {
-        ccFiadoMovementId = fiadoMov.id
-        ccBalanceAfter = fiadoMov.balance_after
-      }
-    }
+    // 4d eliminado: causaba doble DÉBITO en CC para mixto_3
+    // El math es: DÉBITO(total) en 4a + CRÉDITO(paidAmount) via payment trigger en 4b = net correcto
   }
 
   // ── PASO 5: CREAR checkout_transaction ────────────────────────────────────
   const isFree = totalAmount === 0
   const isCCPure = isFiado || isSaldo
-  const paymentStatus = isFree ? 'pagado'
-    : isFiado ? 'fiado'
-    : isSaldo ? 'pagado'
-    : (isMixto3 && amountCC > 0) ? 'parcial'
+  const paymentStatus = isFree        ? 'pagado'
+    : isFiado                         ? 'fiado'
+    : isSaldo                         ? 'pagado'
+    : isMixto3Saldo                   ? 'pagado'
+    : isMixto3Fiado                   ? 'parcial'
     : 'pagado'
 
   const { data: transaction, error: txnErr } = await admin
@@ -561,7 +562,7 @@ export async function POST(request: NextRequest) {
       total_amount:             totalAmount,
       payment_status:           paymentStatus,
       payment_method:           isFree || isCCPure ? null : payment.method,
-      amount_paid:              isFree || isCCPure ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      amount_paid:              isFree || isCCPure ? 0 : isMixto3Saldo ? totalAmount : isMixto3 ? amountCash + amountTransfer : totalAmount,
       amount_cash:              amountCash,
       amount_transfer:          amountTransfer,
       amount_charged_to_cc:     isCCPure ? totalAmount : amountCC,
@@ -569,7 +570,7 @@ export async function POST(request: NextRequest) {
       transfer_detail:          transferDetail,
       transfer_amount_received: transferAmountReceived > 0 ? transferAmountReceived : null,
       payment_id:               paymentId,
-      cc_movement_id:           ccMovementId ?? ccFiadoMovementId,
+      cc_movement_id:           ccMovementId,
       notes:                    dispInputs[0].notes ?? null,
       created_by:               user.id,
     })
@@ -647,13 +648,14 @@ export async function POST(request: NextRequest) {
       products_amount:       productsAmount,
       payment_status:        paymentStatus,
       payment_method:        isFree || isCCPure ? null : payment.method,
-      amount_paid:           isFree || isCCPure ? 0 : (isMixto3 ? amountCash + amountTransfer : totalAmount),
+      amount_paid:           isFree || isCCPure ? 0 : isMixto3Saldo ? totalAmount : isMixto3 ? amountCash + amountTransfer : totalAmount,
       amount_cash:           amountCash,
       amount_transfer:       amountTransfer,
       amount_charged_to_cc:  isCCPure ? totalAmount : amountCC,
       change_given:          changeGiven,
       transfer_detail:       transferDetail,
       cc_balance:            ccBalanceAfter,
+      warnings:              responseWarnings.length > 0 ? responseWarnings : undefined,
     },
   }, { status: 201 })
 }

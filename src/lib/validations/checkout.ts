@@ -32,6 +32,7 @@ export const checkoutPaymentSchema = z.discriminatedUnion('method', [
     amount_cash:             z.number().nonnegative('El monto en efectivo no puede ser negativo'),
     amount_transfer:         z.number().nonnegative('El monto en transferencia no puede ser negativo'),
     amount_cc:               z.number().nonnegative('El monto de cuenta corriente no puede ser negativo'),
+    cc_mode:                 z.enum(['fiado', 'saldo']).optional().default('fiado'),
     transfer_amount_received: z.number().nonnegative().optional(),
     transfer_detail:         z.string().max(500).optional(),
   }),

@@ -14,6 +14,7 @@ export type AuditEntity =
   | 'config'
   | 'cuenta_corriente'
   | 'checkout'
+  | 'egreso_caja'
 
 export type AuditAction =
   | 'crear'

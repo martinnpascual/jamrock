@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Leaf, ShoppingBag, CreditCard, Banknote, ArrowLeftRight, Plus } from 'lucide-react'
+import { CheckCircle2, Leaf, ShoppingBag, CreditCard, Banknote, ArrowLeftRight, Plus, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CheckoutResult } from '@/hooks/useCheckout'
 import type { Member } from '@/types/database'
@@ -147,6 +147,18 @@ export function Step5Confirmation({ result, member, onReset }: Step5Props) {
           </div>
         )}
       </div>
+
+      {/* Warnings (ej: caja no abierta) */}
+      {result.warnings && result.warnings.length > 0 && (
+        <div className="space-y-2">
+          {result.warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2 bg-amber-950/20 border border-amber-700/40 rounded-lg p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300/90">{w}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Botón nueva dispensa */}
       <Button
