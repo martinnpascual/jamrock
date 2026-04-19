@@ -86,11 +86,11 @@ export default function AccountDetailPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold text-slate-800">{account.entity_name ?? '—'}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{account.entity_name ?? '—'}</h2>
               <Badge variant="outline" className="text-xs capitalize">
                 {account.entity_type === 'socio' ? 'Socio' : 'Proveedor'}
               </Badge>
-              <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
+              <span className="font-mono text-xs bg-white/[0.06] px-2 py-0.5 rounded text-slate-400">
                 {account.account_number}
               </span>
             </div>
@@ -120,26 +120,26 @@ export default function AccountDetailPage() {
 
       {/* KPI resumen */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+        <div className="bg-green-950/30 rounded-lg p-4 border border-green-800/40">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-green-600" />
-            <p className="text-xs font-medium text-green-700">Total créditos</p>
+            <p className="text-xs font-medium text-green-400">Total créditos</p>
           </div>
-          <p className="text-xl font-bold text-green-700">{ARS.format(summary.total_creditos)}</p>
+          <p className="text-xl font-bold text-green-400">{ARS.format(summary.total_creditos)}</p>
         </div>
-        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+        <div className="bg-red-950/30 rounded-lg p-4 border border-red-800/40">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="w-4 h-4 text-red-600" />
-            <p className="text-xs font-medium text-red-700">Total débitos</p>
+            <p className="text-xs font-medium text-red-400">Total débitos</p>
           </div>
-          <p className="text-xl font-bold text-red-700">{ARS.format(summary.total_debitos)}</p>
+          <p className="text-xl font-bold text-red-400">{ARS.format(summary.total_debitos)}</p>
         </div>
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <div className="bg-white/[0.03] rounded-lg p-4 border border-white/[0.06]">
           <div className="flex items-center gap-2 mb-1">
             <Activity className="w-4 h-4 text-slate-500" />
-            <p className="text-xs font-medium text-slate-600">Movimientos</p>
+            <p className="text-xs font-medium text-slate-400">Movimientos</p>
           </div>
-          <p className="text-xl font-bold text-slate-700">{summary.movement_count}</p>
+          <p className="text-xl font-bold text-slate-300">{summary.movement_count}</p>
         </div>
       </div>
 
@@ -176,9 +176,9 @@ export default function AccountDetailPage() {
       </div>
 
       {/* Tabla movimientos */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+      <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
         {/* Header */}
-        <div className="hidden lg:grid grid-cols-[1fr_1.5fr_1fr_1fr_1fr_auto] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500 uppercase tracking-wide">
+        <div className="hidden lg:grid grid-cols-[1fr_1.5fr_1fr_1fr_1fr_auto] gap-3 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
           <span>N° / Fecha</span>
           <span>Concepto</span>
           <span className="text-right">Debe</span>
@@ -192,7 +192,7 @@ export default function AccountDetailPage() {
             <p className="text-sm text-slate-400">Sin movimientos en el período seleccionado.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-white/[0.04]">
             {movements.map((m) => (
               <MovementRow
                 key={m.id}
@@ -207,7 +207,7 @@ export default function AccountDetailPage() {
         {/* Paginación */}
         {pagination.total_pages > 1 && (
           <div className={cn(
-            'flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50',
+            'flex items-center justify-between px-4 py-3 border-t border-white/[0.05] bg-white/[0.02]',
           )}>
             <p className="text-xs text-slate-500">
               {pagination.total} movimiento(s) · Página {pagination.page} de {pagination.total_pages}

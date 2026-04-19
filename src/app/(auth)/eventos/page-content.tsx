@@ -50,7 +50,7 @@ export default function EventosPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Eventos</h2>
+          <h2 className="text-lg font-semibold text-foreground">Eventos</h2>
           <p className="text-sm text-slate-500 mt-0.5">{events.length} evento(s) &middot; {upcoming} próximo(s)</p>
         </div>
         {isGerente && (
@@ -61,13 +61,13 @@ export default function EventosPage() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setFilterStatus('all')} className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors', filterStatus === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:border-slate-400')}>
+        <button onClick={() => setFilterStatus('all')} className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors', filterStatus === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'border-white/[0.06] text-slate-400 hover:border-slate-400')}>
           Todos ({events.length})
         </button>
         {EVENT_STATUSES.map(s => {
           const count = events.filter(e => e.status === s.value).length
           return (
-            <button key={s.value} onClick={() => setFilterStatus(s.value)} className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors', filterStatus === s.value ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:border-slate-400')}>
+            <button key={s.value} onClick={() => setFilterStatus(s.value)} className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors', filterStatus === s.value ? 'bg-slate-800 text-white border-slate-800' : 'border-white/[0.06] text-slate-400 hover:border-slate-400')}>
               {s.label} ({count})
             </button>
           )
@@ -152,15 +152,15 @@ function EventCard({ event: ev, isExpanded, onToggle, isGerente }: { event: Even
   const balance = (ev.total_income ?? 0) - (ev.total_cost ?? 0)
 
   return (
-    <div className={cn('bg-white border rounded-xl shadow-sm overflow-hidden', isExpanded ? 'shadow-md border-slate-300' : 'border-slate-200')}>
-      <div className="flex items-center gap-4 px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors" onClick={onToggle}>
+    <div className={cn('bg-[#111111] border rounded-xl shadow-sm overflow-hidden', isExpanded ? 'shadow-md border-white/[0.09]' : 'border-white/[0.06]')}>
+      <div className="flex items-center gap-4 px-4 py-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors" onClick={onToggle}>
         <div className="flex-shrink-0 text-center w-12">
           <p className="text-xs text-slate-400 uppercase leading-none">{new Date(ev.event_date).toLocaleString('es-AR', { month: 'short' })}</p>
-          <p className="text-2xl font-bold text-slate-700 leading-tight">{new Date(ev.event_date).getDate()}</p>
+          <p className="text-2xl font-bold text-slate-300 leading-tight">{new Date(ev.event_date).getDate()}</p>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-slate-800">{ev.name}</p>
+            <p className="text-sm font-semibold text-foreground">{ev.name}</p>
             <Badge variant="outline" className={cn('text-xs shrink-0', si.color)}>{si.label}</Badge>
           </div>
           <div className="flex items-center gap-3 mt-0.5">
@@ -177,25 +177,25 @@ function EventCard({ event: ev, isExpanded, onToggle, isGerente }: { event: Even
       </div>
 
       {isExpanded && (
-        <div className="border-t border-slate-100 px-4 py-4 space-y-4 bg-slate-50/40">
-          {ev.description && <p className="text-sm text-slate-600 italic">{ev.description}</p>}
+        <div className="border-t border-white/[0.05] px-4 py-4 space-y-4 bg-white/[0.02]">
+          {ev.description && <p className="text-sm text-slate-400 italic">{ev.description}</p>}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-lg p-3 border border-slate-200">
+            <div className="bg-white/[0.04] rounded-lg p-3 border border-white/[0.06]">
               <p className="text-xs text-slate-500 flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5 text-red-400" />Costos</p>
-              <p className="text-base font-bold text-slate-700 mt-0.5">{ARS(ev.total_cost ?? 0)}</p>
+              <p className="text-base font-bold text-slate-300 mt-0.5">{ARS(ev.total_cost ?? 0)}</p>
             </div>
-            <div className="bg-white rounded-lg p-3 border border-slate-200">
+            <div className="bg-white/[0.04] rounded-lg p-3 border border-white/[0.06]">
               <p className="text-xs text-slate-500 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-green-400" />Ingresos</p>
-              <p className="text-base font-bold text-slate-700 mt-0.5">{ARS(ev.total_income ?? 0)}</p>
+              <p className="text-base font-bold text-slate-300 mt-0.5">{ARS(ev.total_income ?? 0)}</p>
             </div>
-            <div className={cn('rounded-lg p-3 border', balance >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200')}>
+            <div className={cn('rounded-lg p-3 border', balance >= 0 ? 'bg-green-950/30 border-green-800/50' : 'bg-red-950/30 border-red-800/50')}>
               <p className="text-xs text-slate-500">Balance</p>
-              <p className={cn('text-base font-bold mt-0.5', balance >= 0 ? 'text-green-700' : 'text-red-600')}>{balance >= 0 ? '+' : ''}{ARS(balance)}</p>
+              <p className={cn('text-base font-bold mt-0.5', balance >= 0 ? 'text-green-400' : 'text-red-400')}>{balance >= 0 ? '+' : ''}{ARS(balance)}</p>
             </div>
           </div>
           <AttendeesPanel eventId={ev.id} isGerente={isGerente} eventStatus={ev.status} />
           {isGerente && (
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+            <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">Estado:</span>
                 <Select value={ev.status} onValueChange={v => v !== null && updateStatus.mutate({ id: ev.id, status: v })}>
@@ -236,7 +236,7 @@ function AttendeesPanel({ eventId, isGerente, eventStatus }: { eventId: string; 
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Asistentes ({attendees.length})</p>
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />Asistentes ({attendees.length})</p>
       {canEdit && (
         <div className="flex gap-2">
           <Select value={selectedMember} onValueChange={v => v !== null && setSelectedMember(v)}>
@@ -259,13 +259,13 @@ function AttendeesPanel({ eventId, isGerente, eventStatus }: { eventId: string; 
       ) : (
         <div className="space-y-1.5">
           {attendees.map(a => (
-            <div key={a.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-200">
+            <div key={a.id} className="flex items-center justify-between bg-white/[0.04] rounded-lg px-3 py-2 border border-white/[0.06]">
               <div className="flex items-center gap-2">
                 <button onClick={() => canEdit && markAttendance.mutate({ eventId, attendeeId: a.id, attended: !a.attended })} disabled={!canEdit}
                   className={cn('flex-shrink-0', canEdit ? 'cursor-pointer' : 'cursor-default')}>
                   {a.attended ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-slate-300" />}
                 </button>
-                <span className="text-xs font-medium text-slate-700">{a.members ? `${a.members.first_name} ${a.members.last_name}` : '—'}</span>
+                <span className="text-xs font-medium text-slate-300">{a.members ? `${a.members.first_name} ${a.members.last_name}` : '—'}</span>
                 <span className="text-xs text-slate-400 font-mono">{a.members?.member_number}</span>
               </div>
               {canEdit && <button onClick={() => { if (confirm('¿Quitar este asistente del evento?')) removeAttendee.mutate({ eventId, attendeeId: a.id }) }} className="text-slate-300 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}

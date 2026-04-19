@@ -90,7 +90,7 @@ export function MemberCombobox({
         onClick={handleOpen}
         disabled={disabled}
         className={cn(
-          'w-full flex items-center justify-between gap-2 px-3 h-10 rounded-md border text-sm transition-colors',
+          'w-full flex items-center justify-between gap-2 px-2.5 h-8 rounded-lg border text-sm transition-colors',
           'bg-[#0e0e0e] border-white/[0.12] text-slate-200',
           'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-[#2DC814]/50',
           disabled && 'opacity-50 cursor-not-allowed',

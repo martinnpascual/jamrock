@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { ProductFormData } from '@/lib/validations/sale'
@@ -12,6 +13,21 @@ export type Product = {
 const QK = 'commercial_products'
 
 export function useProducts() {
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('realtime:commercial_products')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'commercial_products' },
+        () => { qc.invalidateQueries({ queryKey: [QK] }) }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [qc])
+
   return useQuery({
     queryKey: [QK],
     queryFn: async (): Promise<Product[]> => {
@@ -21,6 +37,8 @@ export function useProducts() {
       if (error) throw error
       return data ?? []
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime:    24 * 60 * 60 * 1000,
   })
 }
 

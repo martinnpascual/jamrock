@@ -188,7 +188,7 @@ export function AccountsTable() {
                 {/* Acciones */}
                 <div className="flex items-center gap-1">
                   <Link href={`/cuentas-corrientes/${account.id}`}>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-200">
                       <Eye className="w-3.5 h-3.5" />
                     </Button>
                   </Link>

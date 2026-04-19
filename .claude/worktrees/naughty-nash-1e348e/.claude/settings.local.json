@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "mcp__c30e4d4a-9638-420d-92dd-a68a1622363a__deploy_to_vercel",
+      "mcp__c30e4d4a-9638-420d-92dd-a68a1622363a__list_deployments",
+      "mcp__54f38328-89ab-45a1-8952-b3999b6dfcd0__list_migrations",
+      "mcp__c30e4d4a-9638-420d-92dd-a68a1622363a__list_projects",
+      "mcp__54f38328-89ab-45a1-8952-b3999b6dfcd0__list_projects"
+    ]
+  }
+}

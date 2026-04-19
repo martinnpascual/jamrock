@@ -30,7 +30,7 @@ export function MovementRow({ movement: m, canReverse, onReverse }: MovementRowP
 
   return (
     <div className={cn(
-      'grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_auto] gap-2 lg:gap-3 px-4 py-3 items-center hover:bg-slate-50 transition-colors group',
+      'grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_auto] gap-2 lg:gap-3 px-4 py-3 items-center hover:bg-white/[0.03] transition-colors group',
       isReversed && 'opacity-60'
     )}>
       {/* Fecha + N° */}
@@ -43,7 +43,7 @@ export function MovementRow({ movement: m, canReverse, onReverse }: MovementRowP
 
       {/* Concepto + descripción */}
       <div>
-        <p className="text-sm text-slate-700 font-medium capitalize">{m.concept.replace(/_/g, ' ')}</p>
+        <p className="text-sm text-slate-300 font-medium capitalize">{m.concept.replace(/_/g, ' ')}</p>
         {m.description && <p className="text-xs text-slate-400 truncate max-w-[200px]">{m.description}</p>}
         {m.source_type && (
           <span className="text-xs text-slate-400 italic">{SOURCE_LABELS[m.source_type] ?? m.source_type}</span>

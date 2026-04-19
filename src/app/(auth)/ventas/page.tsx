@@ -25,6 +25,7 @@ import {
 import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw, TrendingDown, Receipt } from 'lucide-react'
 import { useCashExpenses, useCreateExpense, useDeleteExpense, EXPENSE_CATEGORIES, type ExpenseCategory } from '@/hooks/useCashExpenses'
 import { cn } from '@/lib/utils'
+import { downloadCashRegisterPDF } from '@/components/cash/CashRegisterPDF'
 
 type Tab = 'ventas' | 'productos' | 'caja'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -513,10 +514,26 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
       await closeReg.mutateAsync({ id: reg.id, actual_total: closeActualTotal, notes: closeNotes || undefined })
       const diff = closeActualTotal - Number(reg.expected_total)
       const diffMsg = diff === 0 ? 'Cuadra perfecto' : diff > 0 ? `Sobrante: +${ARS(diff)}` : `Faltante: ${ARS(diff)}`
+      const closedShift = closingShift
       setClosingShift(null)
       setCloseActualTotal(0)
       setCloseNotes('')
-      showToast(`Caja turno ${closingShift} cerrada. ${diffMsg}`)
+      showToast(`Caja turno ${closedShift} cerrada. ${diffMsg} — Generando PDF...`)
+      // Descargar PDF de cierre
+      try {
+        await downloadCashRegisterPDF({
+          shift: closedShift,
+          date: data?.today ?? new Date().toISOString().split('T')[0],
+          expectedTotal: Number(reg.expected_total),
+          actualTotal: closeActualTotal,
+          difference: diff,
+          notes: closeNotes || undefined,
+          salesTotal: stats.sales_total,
+          paymentsTotal: stats.payments_total,
+        })
+      } catch {
+        // PDF failure is non-critical — no interrumpir el flujo
+      }
     } catch (err) {
       setCloseError(err instanceof Error ? err.message : 'Error al cerrar la caja')
     } finally {

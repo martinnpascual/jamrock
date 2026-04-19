@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "mcp__c30e4d4a-9638-420d-92dd-a68a1622363a__deploy_to_vercel",
+      "Read(//c/Users/Martin/jamrock/**)",
+      "Bash(ls .vercel)",
+      "Bash(cp -r \"C:\\\\Users\\\\Martin\\\\jamrock\\\\.vercel\" \"C:\\\\Users\\\\Martin\\\\jamrock\\\\.claude\\\\worktrees\\\\awesome-blackwell-d608bc\\\\.vercel\")",
+      "Bash(vercel deploy *)"
+    ]
+  }
+}

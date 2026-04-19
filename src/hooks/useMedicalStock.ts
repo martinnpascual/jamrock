@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { StockLotFormData } from '@/lib/validations/stock'
@@ -24,6 +25,23 @@ export type MedicalStockLot = {
 const QUERY_KEY = 'medical_stock_lots'
 
 export function useMedicalStockLots() {
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('realtime:medical_stock_lots')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'medical_stock_lots' },
+        () => {
+          qc.invalidateQueries({ queryKey: [QUERY_KEY] })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [qc])
+
   return useQuery({
     queryKey: [QUERY_KEY, 'active'],
     queryFn: async (): Promise<MedicalStockLot[]> => {

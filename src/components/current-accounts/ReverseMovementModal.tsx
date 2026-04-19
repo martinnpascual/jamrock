@@ -76,22 +76,22 @@ export function ReverseMovementModal({ open, onClose, movement, accountId }: Rev
         </DialogHeader>
 
         {movement && (
-          <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
+          <div className="bg-white/[0.04] rounded-lg p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-slate-500">Movimiento</span>
-              <span className="font-mono text-slate-700">{movement.movement_number}</span>
+              <span className="font-mono text-slate-300">{movement.movement_number}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Tipo</span>
-              <span className="text-slate-700 capitalize">{movement.movement_type}</span>
+              <span className="text-slate-300 capitalize">{movement.movement_type}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Monto</span>
-              <span className="font-semibold text-slate-800">{ARS.format(movement.amount)}</span>
+              <span className="font-semibold text-slate-200">{ARS.format(movement.amount)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Concepto</span>
-              <span className="text-slate-700 capitalize">{movement.concept.replace(/_/g, ' ')}</span>
+              <span className="text-slate-300 capitalize">{movement.concept.replace(/_/g, ' ')}</span>
             </div>
           </div>
         )}

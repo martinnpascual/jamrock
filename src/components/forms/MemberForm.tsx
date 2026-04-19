@@ -88,9 +88,9 @@ export function MemberForm({ member, mode }: MemberFormProps) {
       )}
 
       {/* Datos personales */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="shadow-sm border-white/[0.06]">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-slate-700">Datos personales</CardTitle>
+          <CardTitle className="text-sm font-semibold text-slate-300">Datos personales</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Nombre *" error={errors.first_name?.message}>
@@ -126,9 +126,9 @@ export function MemberForm({ member, mode }: MemberFormProps) {
       </Card>
 
       {/* Membresía */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="shadow-sm border-white/[0.06]">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-slate-700">Membresía</CardTitle>
+          <CardTitle className="text-sm font-semibold text-slate-300">Membresía</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Tipo de socio">
@@ -160,9 +160,9 @@ export function MemberForm({ member, mode }: MemberFormProps) {
       </Card>
 
       {/* REPROCANN */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="shadow-sm border-white/[0.06]">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-slate-700">Estado REPROCANN</CardTitle>
+          <CardTitle className="text-sm font-semibold text-slate-300">Estado REPROCANN</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Estado">
@@ -193,9 +193,9 @@ export function MemberForm({ member, mode }: MemberFormProps) {
       </Card>
 
       {/* Notas */}
-      <Card className="shadow-sm border-slate-200">
+      <Card className="shadow-sm border-white/[0.06]">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-slate-700">Notas internas</CardTitle>
+          <CardTitle className="text-sm font-semibold text-slate-300">Notas internas</CardTitle>
         </CardHeader>
         <CardContent>
           <textarea
