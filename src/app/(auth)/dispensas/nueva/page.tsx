@@ -15,7 +15,7 @@ export default function NuevaDispensaPage() {
             </Button>
           </Link>
           <span className="text-slate-300">/</span>
-          <span className="text-sm font-medium text-slate-300">Nueva dispensa</span>
+          <span className="text-sm font-medium text-slate-700">Nueva dispensa</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           <Lock className="w-3.5 h-3.5" />

@@ -121,8 +121,8 @@ export default function ConfiguracionPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <Settings className="w-5 h-5 text-slate-400" />Configuración
+        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <Settings className="w-5 h-5 text-slate-500" />Configuración
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">
           Parámetros generales del club.{readOnly && ' Solo el gerente puede editar estos valores.'}
@@ -391,13 +391,13 @@ function OperatorsSection() {
         ) : (
           <div className="space-y-2">
             {operators.map(op => (
-              <div key={op.id} className={cn('flex items-center justify-between px-4 py-3 rounded-xl border', op.is_active ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05] opacity-60')}>
+              <div key={op.id} className={cn('flex items-center justify-between px-4 py-3 rounded-xl border', op.is_active ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-200 opacity-60')}>
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold', op.is_active ? 'bg-green-900/40 text-green-400' : 'bg-white/[0.06] text-slate-500')}>
+                  <div className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold', op.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500')}>
                     {op.full_name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-200 truncate">{op.full_name}</p>
+                    <p className="text-sm font-medium text-slate-800 truncate">{op.full_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Badge variant="outline" className={cn('text-xs', ROLE_COLOR[op.role])}>{ROLE_LABEL[op.role]}</Badge>
                       {!op.is_active && <span className="text-xs text-slate-400">Inactivo</span>}

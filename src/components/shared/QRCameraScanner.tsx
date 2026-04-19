@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, Camera, ZapOff, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 interface QRCameraScannerProps {
   onScan: (value: string) => void

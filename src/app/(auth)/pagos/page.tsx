@@ -183,7 +183,7 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
 
       <div>
         {p.payment_method && (
-          <Badge variant="outline" className={cn('text-xs border', METHOD_COLORS[p.payment_method] ?? 'bg-white/[0.04] text-slate-400')}>
+          <Badge variant="outline" className={cn('text-xs border', METHOD_COLORS[p.payment_method] ?? 'bg-slate-50 text-slate-600')}>
             {METHOD_LABELS[p.payment_method] ?? p.payment_method}
           </Badge>
         )}

@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { QRCameraScanner } from '@/components/shared/QRCameraScanner'
 import { Search, QrCode, Loader2, AlertTriangle, ChevronRight, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Member, ReprocannStatus } from '@/types/database'
@@ -25,41 +24,27 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
   const [selected, setSelected]     = useState<Member | null>(null)
   const [ccBalance, setCCBalance]   = useState(0)
   const [searched, setSearched]     = useState(false)
-  const [showCamera, setShowCamera] = useState(false)
 
   const supabase = createClient()
 
-  async function search(overrideQuery?: string) {
-    const q = (overrideQuery ?? query).trim()
-    if (!q) return
+  async function search() {
+    if (!query.trim()) return
     setLoading(true)
     setError(null)
     setResults([])
     setSelected(null)
     setSearched(true)
 
+    const q = query.trim()
     const { data, error: err } = await supabase
       .rpc('search_members', { query: q })
 
     if (err) {
       setError('Error al buscar socios')
     } else {
-      const members = (data ?? []) as Member[]
-      setResults(members)
-      // Si el QR encontró exactamente 1 socio, seleccionarlo automáticamente
-      if (overrideQuery && members.length === 1) {
-        await selectMember(members[0])
-      } else if (overrideQuery && members.length === 0) {
-        setError('QR no reconocido. Buscá el socio manualmente.')
-      }
+      setResults((data ?? []) as Member[])
     }
     setLoading(false)
-  }
-
-  async function handleQRScan(value: string) {
-    setShowCamera(false)
-    setQuery(value)
-    await search(value)
   }
 
   async function selectMember(member: Member) {
@@ -104,18 +89,17 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
           />
         </div>
         <Button
-          onClick={() => search()}
+          onClick={search}
           disabled={loading || !query.trim()}
           className="bg-[#2DC814] hover:bg-[#25a811] text-black font-bold h-11 px-5"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
         </Button>
-        {/* Botón cámara QR — ahora funcional */}
         <Button
           variant="outline"
-          onClick={() => setShowCamera(true)}
-          className="h-11 px-3 border-[#2DC814]/30 text-[#2DC814] hover:bg-[#2DC814]/10 hover:border-[#2DC814]/60 transition-colors"
-          title="Escanear carnet QR"
+          className="h-11 px-3 text-slate-400 cursor-not-allowed opacity-50"
+          title="Escáner QR — próximamente"
+          disabled
           type="button"
         >
           <QrCode className="w-4 h-4" />
@@ -217,14 +201,6 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
             Buscar otro socio
           </button>
         </div>
-      )}
-
-      {/* Escáner QR con cámara */}
-      {showCamera && (
-        <QRCameraScanner
-          onScan={handleQRScan}
-          onClose={() => setShowCamera(false)}
-        />
       )}
     </div>
   )
