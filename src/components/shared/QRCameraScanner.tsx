@@ -10,7 +10,7 @@ interface QRCameraScannerProps {
 
 export function QRCameraScanner({ onScan, onClose }: QRCameraScannerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const scannerRef   = useRef<InstanceType<typeof import('html5-qrcode')['Html5Qrcode']> | null>(null)
+  const scannerRef   = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null)
   const [status, setStatus] = useState<'loading' | 'scanning' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
   const [scanned, setScanned] = useState(false)
