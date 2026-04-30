@@ -13,7 +13,7 @@ export const enrollmentSchema = z.object({
   birth_date: z.string().optional().or(z.literal('')),
   address: z.string().max(200).optional().or(z.literal('')),
   reprocann_status: z
-    .enum(['activo', 'en_tramite', 'vencido'])
+    .enum(['vigente', 'en_tramite', 'iniciar', 'no_tramita', 'baja', 'no_aplica'])
     .optional()
     .nullable(),
   reprocann_number: z.string().max(50).optional().or(z.literal('')),

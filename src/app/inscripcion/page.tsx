@@ -181,7 +181,8 @@ export default function InscripcionPage() {
                 <Label>Estado REPROCANN</Label>
                 <Select
                   onValueChange={(v) => {
-                    const val = v === 'none' ? null : (v as 'activo' | 'en_tramite' | 'vencido')
+                    type RS = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica'
+                    const val = v === 'none' ? null : (v as RS)
                     setValue('reprocann_status', val)
                   }}
                 >
@@ -190,9 +191,10 @@ export default function InscripcionPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No tengo</SelectItem>
-                    <SelectItem value="activo">Activo</SelectItem>
+                    <SelectItem value="vigente">Vigente</SelectItem>
                     <SelectItem value="en_tramite">En trámite</SelectItem>
-                    <SelectItem value="vencido">Vencido</SelectItem>
+                    <SelectItem value="iniciar">Quiero iniciarlo</SelectItem>
+                    <SelectItem value="no_tramita">No voy a tramitarlo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

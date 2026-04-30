@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Socio no encontrado' }, { status: 404 })
   }
 
-  // 1b. REPROCANN activo
-  if (member.reprocann_status !== 'activo') {
+  // 1b. Solo socios con REPROCANN Vigente pueden dispensar
+  if (member.reprocann_status !== 'vigente') {
     return NextResponse.json(
       { error: `Dispensa bloqueada: REPROCANN ${member.reprocann_status}` },
       { status: 422 }

@@ -66,7 +66,7 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
     onMemberSelected(selected, ccBalance)
   }
 
-  const isBlocked = selected && selected.reprocann_status !== 'activo'
+  const isBlocked = selected && selected.reprocann_status !== 'vigente'
 
   return (
     <div className="space-y-5">

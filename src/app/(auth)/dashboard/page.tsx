@@ -33,7 +33,7 @@ export default async function DashboardPage() {
       .from('members')
       .select('id', { count: 'exact', head: true })
       .eq('is_deleted', false)
-      .eq('reprocann_status', 'activo'),
+      .eq('reprocann_status', 'vigente'),
     supabase
       .from('dispensations')
       .select('id', { count: 'exact', head: true })
@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       .from('members')
       .select('id', { count: 'exact', head: true })
       .eq('is_deleted', false)
-      .eq('reprocann_status', 'vencido'),
+      .eq('reprocann_status', 'en_tramite'),
     supabase
       .from('medical_stock_lots')
       .select('id, genetics, current_grams')
@@ -90,8 +90,8 @@ export default async function DashboardPage() {
   const alerts: Alert[] = []
   if ((sociosVencidosRes.count ?? 0) > 0) {
     alerts.push({
-      msg: `${sociosVencidosRes.count} socio(s) con REPROCANN vencido`,
-      href: '/socios?status=vencido',
+      msg: `${sociosVencidosRes.count} socio(s) con REPROCANN en trámite`,
+      href: '/socios?status=en_tramite',
       color: 'text-red-400 bg-red-950/40 border-red-900/50',
     })
   }
@@ -154,12 +154,12 @@ export default async function DashboardPage() {
           badge={(solicitudesRes.count ?? 0) > 0}
         />
         <KPICard
-          title="REPROCANN vencidos"
+          title="REPROCANN en trámite"
           value={sociosVencidosRes.count ?? 0}
           icon={AlertTriangle}
           color={(sociosVencidosRes.count ?? 0) > 0 ? 'text-red-400' : 'text-[#2DC814]'}
           bg={(sociosVencidosRes.count ?? 0) > 0 ? 'bg-red-950/50' : 'bg-[#2DC814]/10'}
-          href="/socios?status=vencido"
+          href="/socios?status=en_tramite"
           badge={(sociosVencidosRes.count ?? 0) > 0}
         />
         {isGerente && (

@@ -174,7 +174,7 @@ export async function PATCH(request: NextRequest) {
         address: req.address ?? null,
         reprocann_status: req.reprocann_status ?? 'en_tramite',
         reprocann_number: req.reprocann_number ?? null,
-        member_type: 'standard',
+        member_type: 'basico',
         notes: req.additional_info ?? null,
         created_by: user.id,
       })

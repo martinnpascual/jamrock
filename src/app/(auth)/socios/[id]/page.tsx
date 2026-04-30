@@ -276,7 +276,7 @@ export default async function MemberDetailPage({
                   {pagos.map((p) => (
                     <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
                       <div>
-                        <p className="text-xs font-medium text-slate-700">${p.amount.toLocaleString('es-AR')}</p>
+                        <p className="text-xs font-medium text-slate-700">${p.amount_ars.toLocaleString('es-AR')}</p>
                         <p className="text-xs text-slate-400">
                           {p.concept} · {p.payment_method ? PAYMENT_METHOD_LABELS[p.payment_method] : ''}
                         </p>

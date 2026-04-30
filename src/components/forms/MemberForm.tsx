@@ -17,12 +17,38 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Save, X } from 'lucide-react'
-import type { Member } from '@/types/database'
+import { AlertCircle, Save, X, Info } from 'lucide-react'
+import { CondicionBadge } from '@/components/shared/CondicionBadge'
+import type { Member, Condicion } from '@/types/database'
 
 interface MemberFormProps {
   member?: Member
   mode: 'create' | 'edit'
+}
+
+function computeCondicionPreview(
+  reprocann: string,
+  cultivador: string,
+  domicilio: string
+): Condicion {
+  if (reprocann === 'baja') return 'asociado_baja'
+  if (reprocann === 'no_tramita') return 'no_tramita_reprocann'
+  if (reprocann === 'no_aplica') return 'no_aplica'
+  if (cultivador === 'jamrock') {
+    if (reprocann === 'vigente') return 'delegacion_sistema_vigente'
+    if (reprocann === 'en_tramite') return 'delegacion_sistema_en_tramite'
+    if (reprocann === 'iniciar') return 'delegacion_sistema_pendiente'
+  }
+  if (cultivador === 'autocultivo' || cultivador === 'otro') {
+    if (domicilio === 'san_lorenzo_426' || domicilio === 'villa_allende') {
+      if (reprocann === 'vigente') return 'delegacion_contrato_vigente'
+      if (reprocann === 'en_tramite' || reprocann === 'iniciar') return 'reiniciar'
+    }
+    if (domicilio === 'personal') {
+      if (reprocann === 'vigente' || reprocann === 'en_tramite' || reprocann === 'iniciar') return 'no_delega'
+    }
+  }
+  return 'no_aplica'
 }
 
 export function MemberForm({ member, mode }: MemberFormProps) {
@@ -44,19 +70,27 @@ export function MemberForm({ member, mode }: MemberFormProps) {
           first_name: member.first_name,
           last_name: member.last_name,
           dni: member.dni,
+          cuit: member.cuit ?? '',
           email: member.email ?? '',
           phone: member.phone ?? '',
           birth_date: member.birth_date ?? '',
           address: member.address ?? '',
-          member_type: (member.member_type as MemberFormData['member_type']) ?? 'standard',
+          member_type: member.member_type ?? 'basico',
           membership_fee: member.membership_fee ?? null,
-          reprocann_status: member.reprocann_status as MemberFormData['reprocann_status'],
+          reprocann_status: member.reprocann_status ?? 'iniciar',
           reprocann_expiry: member.reprocann_expiry ?? '',
           reprocann_number: member.reprocann_number ?? '',
+          cultivador: member.cultivador ?? 'jamrock',
+          domicilio_cultivo: member.domicilio_cultivo ?? 'san_lorenzo_426',
           notes: member.notes ?? '',
         }
       : memberDefaults,
   })
+
+  const reprocannStatus = watch('reprocann_status')
+  const cultivador = watch('cultivador')
+  const domicilioCultivo = watch('domicilio_cultivo')
+  const condicionPreview = computeCondicionPreview(reprocannStatus, cultivador, domicilioCultivo)
 
   const onSubmit = async (data: MemberFormData) => {
     setServerError(null)
@@ -105,6 +139,10 @@ export function MemberForm({ member, mode }: MemberFormProps) {
             <Input {...register('dni')} placeholder="12345678" inputMode="numeric" className="h-10" />
           </FormField>
 
+          <FormField label="CUIT" error={errors.cuit?.message}>
+            <Input {...register('cuit')} placeholder="20-12345678-9" className="h-10" />
+          </FormField>
+
           <FormField label="Fecha de nacimiento" error={errors.birth_date?.message}>
             <Input {...register('birth_date')} type="date" className="h-10" />
           </FormField>
@@ -133,16 +171,17 @@ export function MemberForm({ member, mode }: MemberFormProps) {
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Tipo de socio">
             <Select
-              defaultValue={watch('member_type') ?? 'standard'}
+              defaultValue={watch('member_type') ?? 'basico'}
               onValueChange={(v) => setValue('member_type', v as MemberFormData['member_type'])}
             >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="standard">Estándar</SelectItem>
-                <SelectItem value="therapeutic">Terapéutico</SelectItem>
-                <SelectItem value="honorary">Honorario</SelectItem>
+                <SelectItem value="basico">Básico</SelectItem>
+                <SelectItem value="administrativo">Administrativo</SelectItem>
+                <SelectItem value="autoridad">Autoridad</SelectItem>
+                <SelectItem value="ninguno">Ninguno</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -165,19 +204,21 @@ export function MemberForm({ member, mode }: MemberFormProps) {
           <CardTitle className="text-sm font-semibold text-slate-700">Estado REPROCANN</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Estado">
+          <FormField label="Estado REPROCANN">
             <Select
-              defaultValue={watch('reprocann_status') ?? 'en_tramite'}
+              defaultValue={watch('reprocann_status') ?? 'iniciar'}
               onValueChange={(v) => setValue('reprocann_status', v as MemberFormData['reprocann_status'])}
             >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="activo">✅ Activo</SelectItem>
+                <SelectItem value="vigente">✅ Vigente</SelectItem>
                 <SelectItem value="en_tramite">🟡 En trámite</SelectItem>
-                <SelectItem value="vencido">🔴 Vencido</SelectItem>
-                <SelectItem value="cancelado">⚫ Cancelado</SelectItem>
+                <SelectItem value="iniciar">🔵 Iniciar trámite</SelectItem>
+                <SelectItem value="no_tramita">⚫ No tramita</SelectItem>
+                <SelectItem value="baja">🔴 Baja</SelectItem>
+                <SelectItem value="no_aplica">⬜ No aplica</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -189,6 +230,55 @@ export function MemberForm({ member, mode }: MemberFormProps) {
           <FormField label="Fecha vencimiento" error={errors.reprocann_expiry?.message}>
             <Input {...register('reprocann_expiry')} type="date" className="h-10" />
           </FormField>
+        </CardContent>
+      </Card>
+
+      {/* Cultivo */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-slate-700">Cultivo</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="Cultivador">
+            <Select
+              defaultValue={watch('cultivador') ?? 'jamrock'}
+              onValueChange={(v) => setValue('cultivador', v as MemberFormData['cultivador'])}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="jamrock">Jamrock (el club)</SelectItem>
+                <SelectItem value="autocultivo">Autocultivo</SelectItem>
+                <SelectItem value="otro">Otro cultivador</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <FormField label="Domicilio de cultivo">
+            <Select
+              defaultValue={watch('domicilio_cultivo') ?? 'san_lorenzo_426'}
+              onValueChange={(v) => setValue('domicilio_cultivo', v as MemberFormData['domicilio_cultivo'])}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="san_lorenzo_426">San Lorenzo 426</SelectItem>
+                <SelectItem value="villa_allende">Villa Allende</SelectItem>
+                <SelectItem value="personal">Domicilio personal</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          {/* Condición calculada — solo lectura */}
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <Info className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <span className="text-xs text-slate-500">Condición calculada:</span>
+              <CondicionBadge condicion={condicionPreview} />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

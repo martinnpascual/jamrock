@@ -6,6 +6,7 @@ import { useMembers, useDeleteMember } from '@/hooks/useMembers'
 import { useMonthlyPaymentStatus } from '@/hooks/usePayments'
 import { useFilters } from '@/hooks/useFilters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { CondicionBadge } from '@/components/shared/CondicionBadge'
 import { FilterBar } from '@/components/shared/FilterBar'
 import type { FilterDef } from '@/components/shared/FilterBar'
 import { Input } from '@/components/ui/input'
@@ -32,10 +33,12 @@ const MEMBER_FILTERS: FilterDef[] = [
     label: 'REPROCANN',
     placeholder: 'Todos los estados',
     options: [
-      { value: 'activo', label: 'Activo' },
+      { value: 'vigente', label: 'Vigente' },
       { value: 'en_tramite', label: 'En trámite' },
-      { value: 'vencido', label: 'Vencido' },
-      { value: 'cancelado', label: 'Cancelado' },
+      { value: 'iniciar', label: 'Iniciar trámite' },
+      { value: 'no_tramita', label: 'No tramita' },
+      { value: 'baja', label: 'Baja' },
+      { value: 'no_aplica', label: 'No aplica' },
     ],
   },
   {
@@ -169,10 +172,11 @@ export function MembersTable() {
         <EmptyState hasSearch={!!search || hasActive} />
       ) : (
         <div className="bg-[#111111] border border-white/[0.06] rounded-lg overflow-hidden shadow-sm">
-          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.05] text-xs font-medium text-slate-500 uppercase tracking-wide">
             <span>Socio</span>
             <span>N° Socio</span>
             <span>REPROCANN</span>
+            <span>Condición</span>
             <span>Tipo</span>
             <span>Cuota</span>
             <span>Acciones</span>
@@ -206,7 +210,7 @@ function MemberRow({
   const fullName = `${member.first_name} ${member.last_name}`
 
   return (
-    <div className="px-4 py-3 hover:bg-white/[0.02] transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center">
+    <div className="px-4 py-3 hover:bg-white/[0.02] transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] lg:gap-4 lg:items-center">
       <div className="flex items-center justify-between gap-3 lg:contents">
         {/* Nombre + DNI */}
         <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex lg:items-center lg:gap-3">
@@ -235,6 +239,11 @@ function MemberRow({
                 vence {new Date(member.reprocann_expiry).toLocaleDateString('es-AR')}
               </span>
             )}
+          </div>
+
+          {/* Condición — hidden on mobile */}
+          <div className="hidden lg:block">
+            {member.condicion && <CondicionBadge condicion={member.condicion} />}
           </div>
 
           {/* Tipo — hidden on mobile */}

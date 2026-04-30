@@ -17,7 +17,7 @@ export function useAlertCounts() {
           .from('members')
           .select('id', { count: 'exact', head: true })
           .eq('is_deleted', false)
-          .eq('reprocann_status', 'vencido'),
+          .eq('reprocann_status', 'en_tramite'),
       ])
       return {
         solicitudes: solicitudesRes.count ?? 0,

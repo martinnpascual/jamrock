@@ -1,7 +1,21 @@
 export type UserRole = 'gerente' | 'secretaria' | 'cultivador'
-export type ReprocannStatus = 'activo' | 'en_tramite' | 'vencido' | 'cancelado'
-export type MemberType = 'standard' | 'therapeutic' | 'honorary'
+export type ReprocannStatus = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica'
+export type MemberType = 'basico' | 'administrativo' | 'autoridad' | 'ninguno'
+export type Cultivador = 'jamrock' | 'autocultivo' | 'otro'
+export type DomicilioCultivo = 'san_lorenzo_426' | 'villa_allende' | 'personal'
+export type Condicion =
+  | 'delegacion_sistema_vigente'
+  | 'delegacion_sistema_en_tramite'
+  | 'delegacion_sistema_pendiente'
+  | 'delegacion_contrato_vigente'
+  | 'reiniciar'
+  | 'no_delega'
+  | 'no_tramita_reprocann'
+  | 'asociado_baja'
+  | 'no_aplica'
 export type PaymentMethod = 'efectivo' | 'transferencia' | 'mixto'
+export type PaymentConcept = 'afiliacion' | 'cuota_mensual' | 'cuota_anual' | 'venta' | 'dispensa' | 'otro'
+export type Currency = 'ars' | 'usd'
 export type SupplierType = 'medicinal' | 'comercial' | 'ambos'
 export type EventStatus = 'planificado' | 'activo' | 'cerrado' | 'cancelado'
 export type EnrollmentStatus = 'pendiente' | 'aprobada' | 'rechazada'
@@ -25,15 +39,23 @@ export interface Member {
   first_name: string
   last_name: string
   dni: string
+  cuit: string | null
   email: string | null
   phone: string | null
   birth_date: string | null
   address: string | null
   member_type: MemberType
   membership_fee: number | null
+  // REPROCANN
   reprocann_status: ReprocannStatus
   reprocann_expiry: string | null
   reprocann_number: string | null
+  // Cultivo
+  cultivador: Cultivador
+  domicilio_cultivo: DomicilioCultivo
+  // Condición calculada (GENERATED ALWAYS — nunca editar)
+  condicion: Condicion
+  // QR y foto
   qr_code: string | null
   photo_url: string | null
   notes: string | null
@@ -82,7 +104,10 @@ export interface CommercialProduct {
   name: string
   description: string | null
   category: string | null
-  price: number
+  price_basico: number
+  price_no_delega: number | null
+  price_administrativo: number | null
+  price_autoridad: number | null
   stock_quantity: number
   low_stock_threshold: number
   created_at: string
@@ -91,6 +116,15 @@ export interface CommercialProduct {
   is_deleted: boolean
   deleted_at: string | null
   deleted_by: string | null
+}
+
+export interface ExchangeRate {
+  id: string
+  rate_date: string
+  usd_to_ars: number
+  notes: string | null
+  created_at: string
+  created_by: string | null
 }
 
 export interface Sale {
@@ -126,9 +160,16 @@ export interface CashRegister {
 export interface Payment {
   id: string
   member_id: string
-  amount: number
-  concept: string
+  amount_ars: number
+  amount_usd: number | null
+  currency: Currency
+  exchange_rate_id: string | null
+  concept: PaymentConcept
   payment_method: PaymentMethod | null
+  billing_description: string | null
+  billing_from: string | null
+  billing_to: string | null
+  is_billable: boolean
   notes: string | null
   created_at: string
   updated_at: string
@@ -203,16 +244,18 @@ export interface EnrollmentRequest {
   first_name: string
   last_name: string
   dni: string
+  cuit: string | null
   email: string | null
   phone: string | null
   birth_date: string | null
   address: string | null
   reprocann_status: string | null
   reprocann_number: string | null
+  cultivador: string | null
+  domicilio_cultivo: string | null
   additional_info: string | null
   status: EnrollmentStatus
   rejection_reason: string | null
-  missing_info: string | null
   reviewed_by: string | null
   reviewed_at: string | null
   created_at: string
@@ -246,6 +289,7 @@ export type Database = {
       dispensations: { Row: Dispensation; Insert: Partial<Dispensation>; Update: never }
       medical_stock_lots: { Row: MedicalStockLot; Insert: Partial<MedicalStockLot>; Update: Partial<MedicalStockLot> }
       commercial_products: { Row: CommercialProduct; Insert: Partial<CommercialProduct>; Update: Partial<CommercialProduct> }
+      exchange_rates: { Row: ExchangeRate; Insert: Partial<ExchangeRate>; Update: never }
       sales: { Row: Sale; Insert: Partial<Sale>; Update: Partial<Sale> }
       cash_registers: { Row: CashRegister; Insert: Partial<CashRegister>; Update: Partial<CashRegister> }
       payments: { Row: Payment; Insert: Partial<Payment>; Update: Partial<Payment> }

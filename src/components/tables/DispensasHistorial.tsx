@@ -75,10 +75,11 @@ function buildDispensaFilters(genetics: string[]): FilterDef[] {
       label: 'REPROCANN socio',
       placeholder: 'Todos',
       options: [
-        { value: 'activo', label: 'Activo' },
+        { value: 'vigente', label: 'Vigente' },
         { value: 'en_tramite', label: 'En trámite' },
-        { value: 'vencido', label: 'Vencido' },
-        { value: 'cancelado', label: 'Cancelado' },
+        { value: 'iniciar', label: 'Iniciar trámite' },
+        { value: 'no_tramita', label: 'No tramita' },
+        { value: 'baja', label: 'Baja' },
       ],
     },
     {

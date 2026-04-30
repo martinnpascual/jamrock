@@ -30,19 +30,12 @@ export async function GET(request: NextRequest) {
   const agoCuotaDays = new Date(today)
   agoCuotaDays.setDate(agoCuotaDays.getDate() - cuotaDays)
 
-  // --- Auto-expire REPROCANN vencidos (side effect) ---
-  await admin
-    .from('members')
-    .update({ reprocann_status: 'vencido', updated_at: new Date().toISOString() })
-    .lt('reprocann_expiry', todayStr)
-    .not('reprocann_status', 'in', '(vencido,cancelado)')
-    .eq('is_deleted', false)
-
   // --- 1. REPROCANN por vencer (próximos 30 días) ---
+  // Los estados son gestionados manualmente — no hay auto-expire
   const { data: reprocannProximos } = await admin
     .from('members')
     .select('id, member_number, first_name, last_name, reprocann_expiry, reprocann_number')
-    .eq('reprocann_status', 'activo')
+    .eq('reprocann_status', 'vigente')
     .eq('is_deleted', false)
     .gte('reprocann_expiry', todayStr)
     .lte('reprocann_expiry', inReprocannDaysStr)

@@ -471,11 +471,11 @@ const REPROCANN_COLORS: Record<string, string> = {
 
 function SociosTable({ data }: { data: SocioRow[] }) {
   if (!data.length) return <EmptyReport />
-  const activos = data.filter(d => d.reprocann_status === 'activo').length
+  const activos = data.filter(d => d.reprocann_status === 'vigente').length
   return (
     <>
       <div className="px-5 py-3 bg-sky-500/5 border-b border-sky-500/10 text-sm text-sky-400">
-        {data.length} socios · <strong>{activos} con REPROCANN activo</strong>
+        {data.length} socios · <strong>{activos} con REPROCANN vigente</strong>
       </div>
       <table className="w-full">
         <thead><tr><TH>N° Socio</TH><TH>Nombre</TH><TH>REPROCANN</TH><TH>Tipo</TH><TH>Alta</TH></tr></thead>
