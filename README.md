@@ -3,6 +3,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Getting Started 
 
 First, run the development server:
+<!-- deploy: vencido vs baja + bloqueo CC -->
 
 ```bash
 npm run dev
