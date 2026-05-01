@@ -31,13 +31,14 @@ function computeCondicionPreview(
   cultivador: string,
   domicilio: string
 ): Condicion {
-  if (reprocann === 'baja') return 'asociado_baja'
+  if (reprocann === 'baja')       return 'asociado_baja'
+  if (reprocann === 'vencido')    return 'reprocann_vencido'
   if (reprocann === 'no_tramita') return 'no_tramita_reprocann'
-  if (reprocann === 'no_aplica') return 'no_aplica'
+  if (reprocann === 'no_aplica')  return 'no_aplica'
   if (cultivador === 'jamrock') {
-    if (reprocann === 'vigente') return 'delegacion_sistema_vigente'
+    if (reprocann === 'vigente')    return 'delegacion_sistema_vigente'
     if (reprocann === 'en_tramite') return 'delegacion_sistema_en_tramite'
-    if (reprocann === 'iniciar') return 'delegacion_sistema_pendiente'
+    if (reprocann === 'iniciar')    return 'delegacion_sistema_pendiente'
   }
   if (cultivador === 'autocultivo' || cultivador === 'otro') {
     if (domicilio === 'san_lorenzo_426' || domicilio === 'villa_allende') {
@@ -217,8 +218,9 @@ export function MemberForm({ member, mode }: MemberFormProps) {
                 <SelectItem value="en_tramite">🟡 En trámite</SelectItem>
                 <SelectItem value="iniciar">🔵 Iniciar trámite</SelectItem>
                 <SelectItem value="no_tramita">⚫ No tramita</SelectItem>
-                <SelectItem value="baja">🔴 Baja</SelectItem>
                 <SelectItem value="no_aplica">⬜ No aplica</SelectItem>
+                <SelectItem value="vencido">🔴 REPROCANN vencido</SelectItem>
+                <SelectItem value="baja">❌ Baja del club</SelectItem>
               </SelectContent>
             </Select>
           </FormField>

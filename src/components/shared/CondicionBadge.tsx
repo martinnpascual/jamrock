@@ -10,7 +10,8 @@ const CONDICION_STYLES: Record<Condicion, string> = {
   reiniciar:                     'bg-yellow-50 text-yellow-800 border-yellow-200',
   no_delega:                     'bg-blue-50 text-blue-800 border-blue-200',
   no_tramita_reprocann:          'bg-gray-50 text-gray-700 border-gray-200',
-  asociado_baja:                 'bg-red-50 text-red-800 border-red-200',
+  reprocann_vencido:             'bg-red-50 text-red-700 border-red-200',
+  asociado_baja:                 'bg-red-100 text-red-900 border-red-300',
   no_aplica:                     'bg-gray-50 text-gray-500 border-gray-200',
 }
 

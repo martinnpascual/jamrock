@@ -6,12 +6,13 @@ import type { Member, ReprocannStatus } from '@/types/database'
 import { REPROCANN_STATUS_LABELS } from '@/lib/constants'
 
 const STATUS_COLORS: Record<ReprocannStatus, string> = {
-  vigente: '#16a34a',
+  vigente:    '#16a34a',
   en_tramite: '#ca8a04',
-  iniciar: '#f97316',
+  iniciar:    '#f97316',
   no_tramita: '#6b7280',
-  baja: '#dc2626',
-  no_aplica: '#94a3b8',
+  vencido:    '#ef4444',
+  baja:       '#991b1b',
+  no_aplica:  '#94a3b8',
 }
 
 interface MemberCarnetProps {

@@ -1,5 +1,12 @@
 export type UserRole = 'gerente' | 'secretaria' | 'cultivador'
-export type ReprocannStatus = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica'
+export type ReprocannStatus =
+  | 'vigente'     // REPROCANN activo y vigente — puede dispensar
+  | 'en_tramite'  // en proceso
+  | 'iniciar'     // pendiente de iniciar
+  | 'no_tramita'  // no tramita REPROCANN
+  | 'no_aplica'   // no aplica
+  | 'vencido'     // REPROCANN expiró por fecha (pg_cron) — NO puede dispensar
+  | 'baja'        // dado de baja del CLUB — no del REPROCANN
 export type MemberType = 'basico' | 'administrativo' | 'autoridad' | 'ninguno'
 export type Cultivador = 'jamrock' | 'autocultivo' | 'otro'
 export type DomicilioCultivo = 'san_lorenzo_426' | 'villa_allende' | 'personal'
@@ -11,7 +18,8 @@ export type Condicion =
   | 'reiniciar'
   | 'no_delega'
   | 'no_tramita_reprocann'
-  | 'asociado_baja'
+  | 'reprocann_vencido'   // REPROCANN expiró por fecha
+  | 'asociado_baja'       // dado de baja del CLUB
   | 'no_aplica'
 export type PaymentMethod = 'efectivo' | 'transferencia' | 'mixto'
 export type PaymentConcept = 'afiliacion' | 'cuota_mensual' | 'cuota_anual' | 'venta' | 'dispensa' | 'otro'

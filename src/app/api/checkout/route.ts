@@ -67,10 +67,36 @@ export async function POST(request: NextRequest) {
 
   // 1b. Solo socios con REPROCANN Vigente pueden dispensar
   if (member.reprocann_status !== 'vigente') {
+    const reprocannMsg: Record<string, string> = {
+      vencido:    'REPROCANN vencido — el socio debe renovar su autorización antes de dispensar',
+      baja:       'El socio está dado de baja del club',
+      en_tramite: 'REPROCANN en trámite — aún no habilitado para dispensar',
+      iniciar:    'REPROCANN pendiente de iniciar — no habilitado para dispensar',
+      no_tramita: 'El socio no tramita REPROCANN — no puede dispensar',
+      no_aplica:  'REPROCANN no aplica para este socio',
+    }
     return NextResponse.json(
-      { error: `Dispensa bloqueada: REPROCANN ${member.reprocann_status}` },
+      { error: reprocannMsg[member.reprocann_status] ?? `Dispensa bloqueada: REPROCANN ${member.reprocann_status}` },
       { status: 422 }
     )
+  }
+
+  // 1b-3. Bloquear si el socio tiene deuda en cuenta corriente
+  {
+    const { data: ccAccount } = await admin
+      .from('current_accounts')
+      .select('balance')
+      .eq('member_id', member_id)
+      .eq('is_deleted', false)
+      .single()
+
+    if (ccAccount && ccAccount.balance < 0) {
+      const deuda = Math.abs(Number(ccAccount.balance)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      return NextResponse.json(
+        { error: `El socio tiene una deuda de $${deuda} en cuenta corriente. Debe regularizarla antes de poder dispensar.` },
+        { status: 422 }
+      )
+    }
   }
 
   // 1b-2. Obtener condición del socio para registrarla en la dispensa

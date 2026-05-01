@@ -19,7 +19,7 @@ import { CheckCircle2, Leaf, Loader2, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Lógica de condición (espeja compute_condicion en SQL) ───────────────────
-type ReprocannStatus = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica' | null | undefined
+type ReprocannStatus = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'vencido' | 'baja' | 'no_aplica' | null | undefined
 type Cultivador = 'jamrock' | 'autocultivo' | 'otro' | null | undefined
 type DomicilioCultivo = 'san_lorenzo_426' | 'villa_allende' | 'personal' | null | undefined
 
@@ -30,6 +30,7 @@ function computeCondicion(
 ): string | null {
   if (!reprocann) return null
   if (reprocann === 'baja')       return 'asociado_baja'
+  if (reprocann === 'vencido')    return 'reprocann_vencido'
   if (reprocann === 'no_tramita') return 'no_tramita_reprocann'
   if (reprocann === 'no_aplica')  return 'no_aplica'
 
@@ -61,7 +62,8 @@ const CONDICION_LABELS: Record<string, string> = {
   reiniciar:                       'Reiniciar trámite',
   no_delega:                       'No delega (autocultivo personal)',
   no_tramita_reprocann:            'No tramita REPROCANN',
-  asociado_baja:                   'Asociado de baja',
+  reprocann_vencido:               'REPROCANN vencido — requiere renovación',
+  asociado_baja:                   'Dado de baja del club',
   no_aplica:                       'No aplica',
 }
 
@@ -73,7 +75,8 @@ const CONDICION_COLORS: Record<string, string> = {
   reiniciar:                     'bg-yellow-50 border-yellow-200 text-yellow-700',
   no_delega:                     'bg-blue-50 border-blue-200 text-blue-700',
   no_tramita_reprocann:          'bg-slate-50 border-slate-200 text-slate-600',
-  asociado_baja:                 'bg-red-50 border-red-200 text-red-700',
+  reprocann_vencido:             'bg-red-50 border-red-200 text-red-700',
+  asociado_baja:                 'bg-red-100 border-red-300 text-red-800',
   no_aplica:                     'bg-slate-50 border-slate-200 text-slate-600',
 }
 
@@ -263,7 +266,7 @@ export default function InscripcionPage() {
                   <Select
                     onValueChange={(v) => {
                       const val = v === 'none' ? null : (v as ReprocannStatus)
-                      setValue('reprocann_status', val)
+                      setValue('reprocann_status', val as EnrollmentFormData['reprocann_status'])
                       setReprocannVal(val)
                     }}
                   >

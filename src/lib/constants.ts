@@ -5,20 +5,22 @@ export const REPROCANN_STATUS_LABELS: Record<string, string> = {
   en_tramite: 'En trámite',
   iniciar: 'Iniciar trámite',
   no_tramita: 'No tramita',
-  baja: 'Baja',
   no_aplica: 'No aplica',
+  vencido: 'REPROCANN vencido',  // expiró por fecha — automático
+  baja: 'Baja del club',         // dado de baja del club — manual
 }
 
 export const CONDICION_LABELS: Record<string, string> = {
-  delegacion_sistema_vigente: 'Del. Sistema Vigente',
+  delegacion_sistema_vigente:    'Del. Sistema Vigente',
   delegacion_sistema_en_tramite: 'Del. Sistema En Trámite',
-  delegacion_sistema_pendiente: 'Del. Sistema Pendiente',
-  delegacion_contrato_vigente: 'Del. Contrato Vigente',
-  reiniciar: 'Reiniciar',
-  no_delega: 'No Delega',
-  no_tramita_reprocann: 'No Tramita REPROCANN',
-  asociado_baja: 'Dado de Baja',
-  no_aplica: 'No Aplica',
+  delegacion_sistema_pendiente:  'Del. Sistema Pendiente',
+  delegacion_contrato_vigente:   'Del. Contrato Vigente',
+  reiniciar:                     'Reiniciar',
+  no_delega:                     'No Delega',
+  no_tramita_reprocann:          'No Tramita REPROCANN',
+  reprocann_vencido:             'REPROCANN Vencido',  // expiró por fecha
+  asociado_baja:                 'Dado de Baja del Club',
+  no_aplica:                     'No Aplica',
 }
 
 export const CULTIVADOR_LABELS: Record<string, string> = {

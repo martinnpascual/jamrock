@@ -12,8 +12,9 @@ export const enrollmentSchema = z.object({
   phone: z.string().max(20).optional().or(z.literal('')),
   birth_date: z.string().optional().or(z.literal('')),
   address: z.string().max(200).optional().or(z.literal('')),
+  // baja y vencido son estados internos — no los selecciona un nuevo inscripto
   reprocann_status: z
-    .enum(['vigente', 'en_tramite', 'iniciar', 'no_tramita', 'baja', 'no_aplica'])
+    .enum(['vigente', 'en_tramite', 'iniciar', 'no_tramita', 'no_aplica'])
     .optional()
     .nullable(),
   reprocann_number: z.string().max(50).optional().or(z.literal('')),

@@ -11,7 +11,7 @@ export const memberSchema = z.object({
   address: z.string().optional(),
   member_type: z.enum(['basico', 'administrativo', 'autoridad', 'ninguno']),
   membership_fee: z.coerce.number().positive('Debe ser mayor a 0').optional().nullable(),
-  reprocann_status: z.enum(['vigente', 'en_tramite', 'iniciar', 'no_tramita', 'baja', 'no_aplica']),
+  reprocann_status: z.enum(['vigente', 'en_tramite', 'iniciar', 'no_tramita', 'no_aplica', 'vencido', 'baja']),
   reprocann_expiry: z.string().optional().nullable(),
   reprocann_number: z.string().optional(),
   cultivador: z.enum(['jamrock', 'autocultivo', 'otro']),

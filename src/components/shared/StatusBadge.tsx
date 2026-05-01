@@ -3,21 +3,23 @@ import { REPROCANN_STATUS_LABELS } from '@/lib/constants'
 import type { ReprocannStatus } from '@/types/database'
 
 const STATUS_STYLES: Record<ReprocannStatus, string> = {
-  vigente: 'bg-green-50 text-green-800 border-green-200',
+  vigente:    'bg-green-50 text-green-800 border-green-200',
   en_tramite: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-  iniciar: 'bg-orange-50 text-orange-800 border-orange-200',
+  iniciar:    'bg-orange-50 text-orange-800 border-orange-200',
   no_tramita: 'bg-slate-50 text-slate-600 border-slate-200',
-  baja: 'bg-red-50 text-red-800 border-red-200',
-  no_aplica: 'bg-gray-50 text-gray-500 border-gray-200',
+  no_aplica:  'bg-gray-50 text-gray-500 border-gray-200',
+  vencido:    'bg-red-50 text-red-700 border-red-200',   // REPROCANN expirado — rojo
+  baja:       'bg-red-100 text-red-900 border-red-300',  // Baja del club — rojo más fuerte
 }
 
 const STATUS_DOT: Record<ReprocannStatus, string> = {
-  vigente: 'bg-green-500',
+  vigente:    'bg-green-500',
   en_tramite: 'bg-yellow-500',
-  iniciar: 'bg-orange-400',
+  iniciar:    'bg-orange-400',
   no_tramita: 'bg-slate-400',
-  baja: 'bg-red-500',
-  no_aplica: 'bg-gray-400',
+  no_aplica:  'bg-gray-400',
+  vencido:    'bg-red-400',  // REPROCANN vencido
+  baja:       'bg-red-600',  // Baja del club
 }
 
 interface StatusBadgeProps {
