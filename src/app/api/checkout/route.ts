@@ -73,6 +73,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // 1b-2. Obtener condición del socio para registrarla en la dispensa
+  const { data: memberFull } = await admin
+    .from('members')
+    .select('condicion')
+    .eq('id', member_id)
+    .single()
+  const condicionAtDispense = memberFull?.condicion ?? null
+
   // 1c. Validar lotes medicinales: existen, no eliminados, stock suficiente
   //     Acumular gramos por lot_id para evitar que múltiples dispensas del mismo lote excedan stock
   const uniqueLotIds = Array.from(new Set(dispInputs.map(d => d.lot_id)))
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest) {
     const productIds = items.map(i => i.product_id)
     const { data: productRows, error: prodErr } = await admin
       .from('commercial_products')
-      .select('id, name, price, stock_quantity')
+      .select('id, name, price_basico, stock_quantity')
       .in('id', productIds)
       .eq('is_deleted', false)
 
@@ -123,7 +131,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error al validar productos' }, { status: 500 })
     }
 
-    const foundProducts = new Map((productRows ?? []).map(p => [p.id, p]))
+    // Normalize: rename price_basico → price for internal use
+    const foundProducts = new Map(
+      (productRows ?? []).map(p => [p.id, { ...p, price: (p as unknown as { price_basico: number }).price_basico }])
+    )
 
     for (const item of items) {
       const product = foundProducts.get(item.product_id)
@@ -310,8 +321,9 @@ export async function POST(request: NextRequest) {
         discount_percent: dc.discountPercent,
         discount_amount:  dc.discountAmount,
         total_amount:     dc.amount,
-        payment_method:   totalAmount === 0 ? null : ((isFiado || isSaldo) ? 'cuenta_corriente' : payment.method),
-        payment_status:   paymentStatusForDisp,
+        payment_method:        totalAmount === 0 ? null : ((isFiado || isSaldo) ? 'cuenta_corriente' : payment.method),
+        payment_status:        paymentStatusForDisp,
+        condicion_at_dispense: condicionAtDispense,
       })
       .select('id, dispensation_number')
       .single()

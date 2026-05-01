@@ -15,11 +15,77 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle2, Leaf, Loader2 } from 'lucide-react'
+import { CheckCircle2, Leaf, Loader2, Info } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
+// ─── Lógica de condición (espeja compute_condicion en SQL) ───────────────────
+type ReprocannStatus = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica' | null | undefined
+type Cultivador = 'jamrock' | 'autocultivo' | 'otro' | null | undefined
+type DomicilioCultivo = 'san_lorenzo_426' | 'villa_allende' | 'personal' | null | undefined
+
+function computeCondicion(
+  reprocann: ReprocannStatus,
+  cultivador: Cultivador,
+  domicilioCultivo: DomicilioCultivo,
+): string | null {
+  if (!reprocann) return null
+  if (reprocann === 'baja')       return 'asociado_baja'
+  if (reprocann === 'no_tramita') return 'no_tramita_reprocann'
+  if (reprocann === 'no_aplica')  return 'no_aplica'
+
+  const cult = cultivador ?? 'jamrock'
+  const dom  = domicilioCultivo ?? 'san_lorenzo_426'
+
+  if (cult === 'jamrock') {
+    if (reprocann === 'vigente')    return 'delegacion_sistema_vigente'
+    if (reprocann === 'en_tramite') return 'delegacion_sistema_en_tramite'
+    if (reprocann === 'iniciar')    return 'delegacion_sistema_pendiente'
+  }
+  if (cult === 'autocultivo' || cult === 'otro') {
+    if (dom === 'san_lorenzo_426' || dom === 'villa_allende') {
+      if (reprocann === 'vigente')                           return 'delegacion_contrato_vigente'
+      if (reprocann === 'en_tramite' || reprocann === 'iniciar') return 'reiniciar'
+    }
+    if (dom === 'personal') {
+      if (reprocann === 'vigente' || reprocann === 'en_tramite' || reprocann === 'iniciar') return 'no_delega'
+    }
+  }
+  return 'no_aplica'
+}
+
+const CONDICION_LABELS: Record<string, string> = {
+  delegacion_sistema_vigente:      'Delegación sistema — Vigente',
+  delegacion_sistema_en_tramite:   'Delegación sistema — En trámite',
+  delegacion_sistema_pendiente:    'Delegación sistema — Pendiente',
+  delegacion_contrato_vigente:     'Delegación contrato — Vigente',
+  reiniciar:                       'Reiniciar trámite',
+  no_delega:                       'No delega (autocultivo personal)',
+  no_tramita_reprocann:            'No tramita REPROCANN',
+  asociado_baja:                   'Asociado de baja',
+  no_aplica:                       'No aplica',
+}
+
+const CONDICION_COLORS: Record<string, string> = {
+  delegacion_sistema_vigente:    'bg-green-50 border-green-200 text-green-700',
+  delegacion_contrato_vigente:   'bg-green-50 border-green-200 text-green-700',
+  delegacion_sistema_en_tramite: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+  delegacion_sistema_pendiente:  'bg-yellow-50 border-yellow-200 text-yellow-700',
+  reiniciar:                     'bg-yellow-50 border-yellow-200 text-yellow-700',
+  no_delega:                     'bg-blue-50 border-blue-200 text-blue-700',
+  no_tramita_reprocann:          'bg-slate-50 border-slate-200 text-slate-600',
+  asociado_baja:                 'bg-red-50 border-red-200 text-red-700',
+  no_aplica:                     'bg-slate-50 border-slate-200 text-slate-600',
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function InscripcionPage() {
   const [success, setSuccess] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+
+  // Controlled values for condicion preview
+  const [reprocannVal,     setReprocannVal]     = useState<ReprocannStatus>(null)
+  const [cultivadorVal,    setCultivadorVal]    = useState<Cultivador>('jamrock')
+  const [domicilioVal,     setDomicilioVal]     = useState<DomicilioCultivo>('san_lorenzo_426')
 
   const {
     register,
@@ -28,7 +94,13 @@ export default function InscripcionPage() {
     formState: { errors, isSubmitting },
   } = useForm<EnrollmentFormData>({
     resolver: zodResolver(enrollmentSchema),
+    defaultValues: {
+      cultivador:        'jamrock',
+      domicilio_cultivo: 'san_lorenzo_426',
+    },
   })
+
+  const condicionPreview = computeCondicion(reprocannVal, cultivadorVal, domicilioVal)
 
   async function onSubmit(data: EnrollmentFormData) {
     setServerError(null)
@@ -175,37 +247,114 @@ export default function InscripcionPage() {
               />
             </div>
 
-            {/* REPROCANN */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* ── REPROCANN + Cultivo ── */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-slate-500">
+                  Esta información nos ayuda a determinar tu condición como asociado dentro del club.
+                </p>
+              </div>
+
+              {/* REPROCANN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Estado REPROCANN</Label>
+                  <Select
+                    onValueChange={(v) => {
+                      const val = v === 'none' ? null : (v as ReprocannStatus)
+                      setValue('reprocann_status', val)
+                      setReprocannVal(val)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No tengo / No aplica</SelectItem>
+                      <SelectItem value="vigente">Vigente</SelectItem>
+                      <SelectItem value="en_tramite">En trámite</SelectItem>
+                      <SelectItem value="iniciar">Quiero iniciarlo</SelectItem>
+                      <SelectItem value="no_tramita">No voy a tramitarlo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reprocann_number">N° de registro REPROCANN</Label>
+                  <Input
+                    id="reprocann_number"
+                    placeholder="RPC-XXXXX"
+                    {...register('reprocann_number')}
+                  />
+                </div>
+              </div>
+
+              {/* Cultivador */}
               <div className="space-y-1.5">
-                <Label>Estado REPROCANN</Label>
+                <Label>¿Quién cultiva tu cannabis?</Label>
                 <Select
+                  defaultValue="jamrock"
                   onValueChange={(v) => {
-                    type RS = 'vigente' | 'en_tramite' | 'iniciar' | 'no_tramita' | 'baja' | 'no_aplica'
-                    const val = v === 'none' ? null : (v as RS)
-                    setValue('reprocann_status', val)
+                    const val = v as Cultivador
+                    setValue('cultivador', val)
+                    setCultivadorVal(val)
+                    // Reset domicilio al cambiar cultivador
+                    if (val === 'jamrock') {
+                      setValue('domicilio_cultivo', 'san_lorenzo_426')
+                      setDomicilioVal('san_lorenzo_426')
+                    }
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar..." />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No tengo</SelectItem>
-                    <SelectItem value="vigente">Vigente</SelectItem>
-                    <SelectItem value="en_tramite">En trámite</SelectItem>
-                    <SelectItem value="iniciar">Quiero iniciarlo</SelectItem>
-                    <SelectItem value="no_tramita">No voy a tramitarlo</SelectItem>
+                    <SelectItem value="jamrock">Jamrock (el club cultiva por mí)</SelectItem>
+                    <SelectItem value="autocultivo">Yo mismo (autocultivo)</SelectItem>
+                    <SelectItem value="otro">Otro cultivador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reprocann_number">N° de registro REPROCANN</Label>
-                <Input
-                  id="reprocann_number"
-                  placeholder="RPC-XXXXX"
-                  {...register('reprocann_number')}
-                />
-              </div>
+
+              {/* Domicilio de cultivo — solo si no es jamrock */}
+              {(cultivadorVal === 'autocultivo' || cultivadorVal === 'otro') && (
+                <div className="space-y-1.5">
+                  <Label>Domicilio de cultivo</Label>
+                  <Select
+                    defaultValue="san_lorenzo_426"
+                    onValueChange={(v) => {
+                      const val = v as DomicilioCultivo
+                      setValue('domicilio_cultivo', val)
+                      setDomicilioVal(val)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="san_lorenzo_426">Sede San Lorenzo 426</SelectItem>
+                      <SelectItem value="villa_allende">Sede Villa Allende</SelectItem>
+                      <SelectItem value="personal">Domicilio personal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Preview condición */}
+              {condicionPreview && (
+                <div className={cn(
+                  'flex items-center gap-2 rounded-lg border px-3 py-2.5',
+                  CONDICION_COLORS[condicionPreview] ?? 'bg-slate-50 border-slate-200 text-slate-600'
+                )}>
+                  <Leaf className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide opacity-60">Tu condición estimada</p>
+                    <p className="text-sm font-medium">
+                      {CONDICION_LABELS[condicionPreview] ?? condicionPreview}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Info adicional */}

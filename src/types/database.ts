@@ -77,8 +77,29 @@ export interface Dispensation {
   type: DispensationType
   nullifies_id: string | null
   notes: string | null
+  // Precio y descuento (registrado al momento de dispensar)
+  price_per_gram: number | null
+  subtotal: number | null
+  discount_percent: number | null
+  discount_amount: number | null
+  total_amount: number | null
+  payment_method: string | null
+  payment_status: 'pagado' | 'fiado' | 'parcial' | 'sin_cargo' | null
+  condicion_at_dispense: Condicion | null
   created_at: string
   created_by: string | null
+}
+
+export interface MemberConditionHistory {
+  id: string
+  member_id: string
+  old_condicion: Condicion | null
+  new_condicion: Condicion
+  old_reprocann_status: ReprocannStatus | null
+  new_reprocann_status: ReprocannStatus | null
+  changed_at: string
+  changed_by: string | null
+  reason: string | null
 }
 
 export interface MedicalStockLot {
@@ -287,6 +308,7 @@ export type Database = {
       profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile> }
       members: { Row: Member; Insert: Partial<Member>; Update: Partial<Member> }
       dispensations: { Row: Dispensation; Insert: Partial<Dispensation>; Update: never }
+      member_condition_history: { Row: MemberConditionHistory; Insert: Partial<MemberConditionHistory>; Update: never }
       medical_stock_lots: { Row: MedicalStockLot; Insert: Partial<MedicalStockLot>; Update: Partial<MedicalStockLot> }
       commercial_products: { Row: CommercialProduct; Insert: Partial<CommercialProduct>; Update: Partial<CommercialProduct> }
       exchange_rates: { Row: ExchangeRate; Insert: Partial<ExchangeRate>; Update: never }

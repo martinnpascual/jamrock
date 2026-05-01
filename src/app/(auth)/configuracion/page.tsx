@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2, ShoppingCart, ToggleLeft, ToggleRight, Clock, ChevronRight } from 'lucide-react'
+import { Settings, Lock, Bell, Users, CheckCircle2, XCircle, Loader2, ShoppingCart, ToggleLeft, ToggleRight, Clock, ChevronRight, DollarSign, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/types/database'
@@ -203,7 +203,10 @@ export default function ConfiguracionPage() {
       {/* ── Sección 3: Dispensas y Checkout ── */}
       <CheckoutConfigSection isGerente={isGerente} />
 
-      {/* ── Sección 4: Horas trabajadas (solo gerente) ── */}
+      {/* ── Sección 4: Tipo de cambio USD/ARS ── */}
+      <ExchangeRateSection isGerente={isGerente} />
+
+      {/* ── Sección 5: Horas trabajadas (solo gerente) ── */}
       {isGerente && <HorasSection />}
 
       {/* ── Sección 5: Operadores (solo gerente) ── */}
@@ -339,6 +342,167 @@ function CheckoutConfigSection({ isGerente }: { isGerente: boolean }) {
                 </Button>
                 {error  && <p className="text-sm text-red-500">{error}</p>}
                 {saved  && <p className="text-sm text-green-500 font-medium">Guardado ✓</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Tipo de Cambio ───────────────────────────────────────────────────────────
+type ExchangeRate = { id: string; rate_date: string; usd_to_ars: number; notes: string | null }
+
+function useExchangeRates() {
+  return useQuery<ExchangeRate[]>({
+    queryKey: ['exchange-rates'],
+    queryFn: async () => {
+      const res = await fetch('/api/exchange-rates')
+      if (!res.ok) throw new Error('Error cargando tipos de cambio')
+      const body = await res.json()
+      return body.exchange_rates
+    },
+  })
+}
+
+function useSaveExchangeRate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { rate_date: string; usd_to_ars: number; notes?: string }) => {
+      const res = await fetch('/api/exchange-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error ?? 'Error') }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['exchange-rates'] }),
+  })
+}
+
+function ExchangeRateSection({ isGerente }: { isGerente: boolean }) {
+  const today = new Date().toISOString().split('T')[0]
+  const { data: rates = [], isLoading } = useExchangeRates()
+  const saveMutation = useSaveExchangeRate()
+
+  const [rateDate,  setRateDate]  = useState(today)
+  const [rateValue, setRateValue] = useState('')
+  const [rateNotes, setRateNotes] = useState('')
+  const [saved,     setSaved]     = useState(false)
+  const [error,     setError]     = useState('')
+
+  const canEdit = isGerente
+
+  // Si hay un registro de hoy, pre-cargar
+  useEffect(() => {
+    const todayRow = rates.find(r => r.rate_date === today)
+    if (todayRow) {
+      setRateValue(String(todayRow.usd_to_ars))
+      setRateNotes(todayRow.notes ?? '')
+    }
+  }, [rates, today])
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setError(''); setSaved(false)
+    const val = parseFloat(rateValue)
+    if (!rateDate || isNaN(val) || val <= 0) {
+      setError('Ingresá una fecha y un valor mayor a 0')
+      return
+    }
+    try {
+      await saveMutation.mutateAsync({ rate_date: rateDate, usd_to_ars: val, notes: rateNotes || undefined })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
+    }
+  }
+
+  const ARS = (n: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
+  const formatDate = (d: string) => {
+    const [y, m, day] = d.split('-')
+    return `${day}/${m}/${y}`
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-slate-500" />
+          Tipo de cambio USD/ARS
+          {!canEdit && <Lock className="w-4 h-4 text-slate-400" />}
+        </CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">Registrá el dólar del día para cálculos de costos</p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-3">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : (
+          <div className="space-y-4">
+            {/* Formulario */}
+            <form onSubmit={handleSave} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="Fecha"
+                  type="date"
+                  value={rateDate}
+                  onChange={setRateDate}
+                  disabled={!canEdit}
+                />
+                <Field
+                  label="USD → ARS"
+                  type="number"
+                  value={rateValue}
+                  onChange={setRateValue}
+                  placeholder="ej: 1250"
+                  disabled={!canEdit}
+                />
+              </div>
+              <Field
+                label="Notas (opcional)"
+                value={rateNotes}
+                onChange={setRateNotes}
+                placeholder="ej: Dólar blue, Dólar oficial..."
+                disabled={!canEdit}
+              />
+              {canEdit && (
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="submit"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={saveMutation.isPending}
+                  >
+                    {saveMutation.isPending
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                      : 'Guardar tipo de cambio'}
+                  </Button>
+                  {error  && <p className="text-sm text-red-500">{error}</p>}
+                  {saved  && <p className="text-sm text-green-600 font-medium">Guardado ✓</p>}
+                </div>
+              )}
+            </form>
+
+            {/* Historial reciente */}
+            {rates.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <RefreshCw className="w-3 h-3" />Últimos registros
+                </p>
+                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                  {rates.slice(0, 7).map(r => (
+                    <div key={r.id} className="flex items-center justify-between px-3 py-2 text-sm bg-white">
+                      <span className="text-slate-500">{formatDate(r.rate_date)}</span>
+                      <div className="text-right">
+                        <span className="font-semibold text-slate-800">{ARS(r.usd_to_ars)}</span>
+                        {r.notes && <span className="text-xs text-slate-400 ml-2">{r.notes}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

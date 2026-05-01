@@ -17,6 +17,14 @@ export const enrollmentSchema = z.object({
     .optional()
     .nullable(),
   reprocann_number: z.string().max(50).optional().or(z.literal('')),
+  cultivador: z
+    .enum(['jamrock', 'autocultivo', 'otro'])
+    .optional()
+    .nullable(),
+  domicilio_cultivo: z
+    .enum(['san_lorenzo_426', 'villa_allende', 'personal'])
+    .optional()
+    .nullable(),
   additional_info: z.string().max(1000).optional().or(z.literal('')),
 })
 
