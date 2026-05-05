@@ -21,6 +21,8 @@ import {
   Trash2,
   Users,
   ChevronRight,
+  ArrowDownAZ,
+  ArrowUpAZ,
 } from 'lucide-react'
 import type { Member, ReprocannStatus } from '@/types/database'
 import { MEMBER_TYPE_LABELS } from '@/lib/constants'
@@ -65,11 +67,12 @@ export function MembersTable() {
   const { data: paidMemberIds } = useMonthlyPaymentStatus()
   const deleteMember = useDeleteMember()
   const [search, setSearch] = useState('')
+  const [sortAlpha, setSortAlpha] = useState<'asc' | 'desc' | null>(null)
   const { values: filters, set: setFilter, clear: clearFilters, hasActive } = useFilters(FILTER_KEYS)
 
   const filtered = useMemo(() => {
     if (!members) return []
-    return members.filter((m) => {
+    const result = members.filter((m) => {
       const matchesSearch =
         !search ||
         `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -92,7 +95,17 @@ export function MembersTable() {
 
       return matchesSearch && matchesReprocann && matchesType && matchesCuota
     })
-  }, [members, search, filters, paidMemberIds])
+    if (sortAlpha) {
+      result.sort((a, b) => {
+        const nameA = `${a.last_name} ${a.first_name}`.toLowerCase()
+        const nameB = `${b.last_name} ${b.first_name}`.toLowerCase()
+        return sortAlpha === 'asc'
+          ? nameA.localeCompare(nameB, 'es')
+          : nameB.localeCompare(nameA, 'es')
+      })
+    }
+    return result
+  }, [members, search, filters, paidMemberIds, sortAlpha])
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`¿Dar de baja a ${name}? Esta acción puede revertirse.`)) return
@@ -133,12 +146,34 @@ export function MembersTable() {
             className="pl-9 h-10"
           />
         </div>
-        <Link href="/socios/nuevo">
-          <Button className="bg-green-600 hover:bg-green-700 text-white h-10 gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo socio
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className={`h-10 gap-2 ${sortAlpha ? 'border-green-600 text-green-400' : ''}`}
+            onClick={() => {
+              if (!sortAlpha) setSortAlpha('asc')
+              else if (sortAlpha === 'asc') setSortAlpha('desc')
+              else setSortAlpha(null)
+            }}
+            title="Ordenar alfabéticamente"
+          >
+            {sortAlpha === 'desc' ? (
+              <ArrowUpAZ className="w-4 h-4" />
+            ) : (
+              <ArrowDownAZ className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">
+              {!sortAlpha ? 'A–Z' : sortAlpha === 'asc' ? 'A–Z' : 'Z–A'}
+            </span>
           </Button>
-        </Link>
+          <Link href="/socios/nuevo">
+            <Button className="bg-green-600 hover:bg-green-700 text-white h-10 gap-2">
+              <Plus className="w-4 h-4" />
+              Nuevo socio
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* FilterBar */}

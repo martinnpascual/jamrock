@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import type { StockLotFormData } from '@/lib/validations/stock'
+import type { StockLotFormData, StockLotEditData } from '@/lib/validations/stock'
 
 export type MedicalStockLot = {
   id: string
@@ -24,6 +25,23 @@ export type MedicalStockLot = {
 const QUERY_KEY = 'medical_stock_lots'
 
 export function useMedicalStockLots() {
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('realtime:medical_stock_lots')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'medical_stock_lots' },
+        () => {
+          qc.invalidateQueries({ queryKey: [QUERY_KEY] })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [qc])
+
   return useQuery({
     queryKey: [QUERY_KEY, 'active'],
     queryFn: async (): Promise<MedicalStockLot[]> => {
@@ -68,6 +86,27 @@ export function useCreateStockLot() {
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error ?? 'Error al crear lote')
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] })
+    },
+  })
+}
+
+export function useUpdateStockLot() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (formData: StockLotEditData) => {
+      const res = await fetch('/api/stock', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error ?? 'Error al actualizar lote')
       }
       return res.json()
     },

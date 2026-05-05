@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { stockLotSchema } from '@/lib/validations/stock'
+import { stockLotSchema, stockLotEditSchema } from '@/lib/validations/stock'
 import { logActivity, getUserName } from '@/lib/audit'
 
 // POST — crear nuevo lote de stock medicinal
@@ -77,6 +77,87 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({ lot: data }, { status: 201 })
+}
+
+// PATCH — editar datos de un lote (solo gerente)
+export async function PATCH(request: NextRequest) {
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.role !== 'gerente') {
+    return NextResponse.json({ error: 'Solo el gerente puede editar lotes' }, { status: 403 })
+  }
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
+  }
+
+  const parsed = stockLotEditSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Datos inválidos', details: parsed.error.flatten() },
+      { status: 422 }
+    )
+  }
+
+  const { id, genetics, cost_per_gram, price_per_gram, lot_date, notes,
+          is_outsourced, outsourced_provider_name, cost_total, sale_price_total } = parsed.data
+
+  const admin = createAdminClient()
+
+  // Fetch current lot for audit diff
+  const { data: before } = await admin
+    .from('medical_stock_lots')
+    .select('genetics, price_per_gram, cost_per_gram, notes')
+    .eq('id', id)
+    .single()
+
+  const { data, error } = await admin
+    .from('medical_stock_lots')
+    .update({
+      genetics,
+      cost_per_gram: cost_per_gram ?? null,
+      price_per_gram: price_per_gram ?? 0,
+      lot_date: lot_date || undefined,
+      notes: notes || null,
+      is_outsourced: is_outsourced ?? false,
+      outsourced_provider_name: is_outsourced ? (outsourced_provider_name ?? null) : null,
+      cost_total: is_outsourced ? (cost_total ?? null) : null,
+      sale_price_total: is_outsourced ? (sale_price_total ?? null) : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('is_deleted', false)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('stock lot update error:', error.code)
+    return NextResponse.json({ error: 'Error al actualizar lote' }, { status: 500 })
+  }
+
+  const userName = await getUserName(supabase, user.id)
+  await logActivity({
+    admin, userId: user.id, userName,
+    action: 'editar', entity: 'stock', entityId: id,
+    description: `Editó lote de ${data.genetics} (genética: ${before?.genetics ?? '?'} → ${data.genetics}, precio: $${before?.price_per_gram ?? '?'} → $${data.price_per_gram}/g)`,
+    metadata: { before, after: { genetics, price_per_gram, cost_per_gram, notes } },
+  })
+
+  return NextResponse.json({ lot: data })
 }
 
 // DELETE (soft) — dar de baja un lote

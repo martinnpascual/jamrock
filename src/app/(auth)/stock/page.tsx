@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { stockLotSchema, type StockLotFormData } from '@/lib/validations/stock'
-import { useAllStockLots, useCreateStockLot, useDeleteStockLot, useLotMovements, type MedicalStockLot } from '@/hooks/useMedicalStock'
+import { stockLotSchema, stockLotEditSchema, type StockLotFormData, type StockLotEditData } from '@/lib/validations/stock'
+import { useAllStockLots, useCreateStockLot, useDeleteStockLot, useUpdateStockLot, useLotMovements, type MedicalStockLot } from '@/hooks/useMedicalStock'
 import { useRole } from '@/hooks/useRole'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Package, Plus, Loader2, Leaf, ChevronDown, ChevronUp, Trash2, TrendingDown, ExternalLink } from 'lucide-react'
+import { Package, Plus, Loader2, Leaf, ChevronDown, ChevronUp, Trash2, TrendingDown, ExternalLink, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function StockPage() {
@@ -30,6 +30,8 @@ export default function StockPage() {
 
   const canCreate = role === 'gerente' || role === 'cultivador'
   const canDelete = role === 'gerente'
+  const canEdit = role === 'gerente'
+  const [editingLot, setEditingLot] = useState<MedicalStockLot | null>(null)
 
   const totalGrams = lots.reduce((s, l) => s + (l.current_grams > 0 ? l.current_grams : 0), 0)
   const activeLots = lots.filter((l) => l.current_grams > 0).length
@@ -95,12 +97,15 @@ export default function StockPage() {
               expanded={expandedLot === lot.id}
               onToggle={() => setExpandedLot(expandedLot === lot.id ? null : lot.id)}
               canDelete={canDelete}
+              canEdit={canEdit}
+              onEdit={() => setEditingLot(lot)}
             />
           ))}
         </div>
       )}
 
       <NewLotDialog open={showForm} onClose={() => setShowForm(false)} />
+      <EditLotDialog lot={editingLot} onClose={() => setEditingLot(null)} />
     </div>
   )
 }
@@ -110,11 +115,15 @@ function LotCard({
   expanded,
   onToggle,
   canDelete,
+  canEdit,
+  onEdit,
 }: {
   lot: MedicalStockLot
   expanded: boolean
   onToggle: () => void
   canDelete: boolean
+  canEdit: boolean
+  onEdit: () => void
 }) {
   const { data: movements = [], isLoading: loadingMovements } = useLotMovements(expanded ? lot.id : '')
   const deleteMutation = useDeleteStockLot()
@@ -234,17 +243,30 @@ function LotCard({
             )}
           </div>
 
-          {canDelete && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-red-400 border-red-900/50 hover:bg-red-950/40 h-8 gap-1.5 text-xs"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Dar de baja lote
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-slate-300 border-white/[0.1] hover:bg-white/5 h-8 gap-1.5 text-xs"
+                onClick={onEdit}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Editar lote
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-red-400 border-red-900/50 hover:bg-red-950/40 h-8 gap-1.5 text-xs"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Dar de baja lote
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -456,6 +478,178 @@ function NewLotDialog({ open, onClose }: { open: boolean; onClose: () => void })
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditLotDialog({ lot, onClose }: { lot: MedicalStockLot | null; onClose: () => void }) {
+  const updateMutation = useUpdateStockLot()
+  const [isOutsourced, setIsOutsourced] = useState(false)
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<StockLotEditData>({
+    resolver: zodResolver(stockLotEditSchema),
+  })
+
+  // Populate form when lot changes
+  const open = !!lot
+  useState(() => {
+    if (lot) {
+      reset({
+        id: lot.id,
+        genetics: lot.genetics,
+        cost_per_gram: lot.cost_per_gram ?? undefined,
+        price_per_gram: lot.price_per_gram,
+        lot_date: lot.lot_date,
+        notes: lot.notes ?? '',
+        is_outsourced: lot.is_outsourced,
+        outsourced_provider_name: lot.outsourced_provider_name ?? '',
+        cost_total: lot.cost_total ?? undefined,
+        sale_price_total: lot.sale_price_total ?? undefined,
+      })
+      setIsOutsourced(lot.is_outsourced)
+    }
+  })
+
+  const costTotal = watch('cost_total')
+  const salePriceTotal = watch('sale_price_total')
+  const netProfit = (salePriceTotal ?? 0) - (costTotal ?? 0)
+  const margin = costTotal && costTotal > 0 ? ((netProfit / costTotal) * 100).toFixed(1) : null
+
+  async function onSubmit(data: StockLotEditData) {
+    try {
+      await updateMutation.mutateAsync({ ...data, is_outsourced: isOutsourced })
+      onClose()
+    } catch {
+      // error shown below
+    }
+  }
+
+  // Re-populate whenever lot prop changes
+  if (lot && open) {
+    // noop — form is reset via useEffect substitute above
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar lote — {lot?.genetics}</DialogTitle>
+        </DialogHeader>
+        {lot && (
+          <form
+            key={lot.id}
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-4"
+          >
+            <input type="hidden" {...register('id')} value={lot.id} />
+
+            <div className="space-y-1.5">
+              <Label>Genética / Variedad *</Label>
+              <Input
+                placeholder="Ej: OG Kush, Amnesia Haze..."
+                defaultValue={lot.genetics}
+                {...register('genetics')}
+                className={errors.genetics ? 'border-red-400' : ''}
+              />
+              {errors.genetics && <p className="text-xs text-red-500">{errors.genetics.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Costo por gramo ($)</Label>
+                <Input type="number" step="0.01" placeholder="0.00" defaultValue={lot.cost_per_gram ?? ''} {...register('cost_per_gram')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Precio por gramo ($) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="15000"
+                  defaultValue={lot.price_per_gram}
+                  {...register('price_per_gram')}
+                  className={errors.price_per_gram ? 'border-red-400' : ''}
+                />
+                {errors.price_per_gram && <p className="text-xs text-red-500">{errors.price_per_gram.message}</p>}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Fecha del lote</Label>
+              <Input type="date" defaultValue={lot.lot_date} {...register('lot_date')} />
+            </div>
+
+            {/* Toggle tercerización */}
+            <div className="flex items-center justify-between py-2 border-y border-white/[0.06]">
+              <div>
+                <p className="text-sm font-medium text-slate-200">¿Lote tercerizado?</p>
+                <p className="text-xs text-slate-500">Genética provista por un proveedor externo</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOutsourced((v) => !v)}
+                className={cn(
+                  'relative w-11 h-6 rounded-full transition-colors',
+                  isOutsourced ? 'bg-amber-500' : 'bg-white/10'
+                )}
+              >
+                <span className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                  isOutsourced ? 'translate-x-5' : 'translate-x-0.5'
+                )} />
+              </button>
+            </div>
+
+            {isOutsourced && (
+              <div className="space-y-3 p-3 bg-amber-950/20 border border-amber-900/30 rounded-lg">
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Datos de tercerización</p>
+                <div className="space-y-1.5">
+                  <Label>Proveedor externo</Label>
+                  <Input placeholder="Nombre del proveedor" defaultValue={lot.outsourced_provider_name ?? ''} {...register('outsourced_provider_name')} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Costo total ($)</Label>
+                    <Input type="number" step="0.01" placeholder="0" defaultValue={lot.cost_total ?? ''} {...register('cost_total')} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Venta total ($)</Label>
+                    <Input type="number" step="0.01" placeholder="0" defaultValue={lot.sale_price_total ?? ''} {...register('sale_price_total')} />
+                  </div>
+                </div>
+                {(costTotal || salePriceTotal) && (
+                  <div className={cn(
+                    'flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold',
+                    netProfit >= 0 ? 'bg-[#2DC814]/10 text-[#2DC814]' : 'bg-red-950/40 text-red-400'
+                  )}>
+                    <span>Ganancia neta</span>
+                    <span>
+                      ${netProfit.toLocaleString('es-AR')}
+                      {margin && <span className="text-xs ml-2 opacity-70">({margin}%)</span>}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Notas</Label>
+              <Textarea placeholder="Origen, cepa, condiciones..." rows={2} defaultValue={lot.notes ?? ''} {...register('notes')} />
+            </div>
+
+            {updateMutation.error && (
+              <p className="text-sm text-red-500">{(updateMutation.error as Error).message}</p>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>Cancelar</Button>
+              <Button type="submit" disabled={isSubmitting || updateMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+                {isSubmitting || updateMutation.isPending
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                  : 'Guardar cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   )

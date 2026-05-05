@@ -25,3 +25,18 @@ export const stockLotSchema = z.object({
 })
 
 export type StockLotFormData = z.infer<typeof stockLotSchema>
+
+export const stockLotEditSchema = z.object({
+  id: z.string().uuid(),
+  genetics: z.string().min(1, 'La genética es requerida').max(100),
+  cost_per_gram: z.coerce.number().nonnegative().optional().nullable(),
+  price_per_gram: z.coerce.number().nonnegative('El precio no puede ser negativo').default(0),
+  lot_date: z.string().optional().or(z.literal('')),
+  notes: z.string().max(500).optional().or(z.literal('')),
+  is_outsourced: z.boolean().default(false),
+  outsourced_provider_name: z.string().max(200).optional().nullable(),
+  cost_total: z.coerce.number().nonnegative().optional().nullable(),
+  sale_price_total: z.coerce.number().nonnegative().optional().nullable(),
+})
+
+export type StockLotEditData = z.infer<typeof stockLotEditSchema>

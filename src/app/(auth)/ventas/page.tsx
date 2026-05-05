@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema, saleSchema, CATEGORIES, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
 import { useProducts, useCreateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
@@ -25,6 +25,7 @@ import {
 import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw, TrendingDown, Receipt } from 'lucide-react'
 import { useCashExpenses, useCreateExpense, useDeleteExpense, EXPENSE_CATEGORIES, type ExpenseCategory } from '@/hooks/useCashExpenses'
 import { cn } from '@/lib/utils'
+import { downloadCashRegisterPDF } from '@/components/cash/CashRegisterPDF'
 
 type Tab = 'ventas' | 'productos' | 'caja'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -254,7 +255,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   const [confirmDeleteProd, setConfirmDeleteProd] = useState<{ id: string; name: string } | null>(null)
   const low = products.filter(p => p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold).length
   const empty = products.filter(p => p.stock_quantity === 0).length
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
+  const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
   })
   async function onSubmit(data: ProductFormData) {
@@ -284,8 +285,22 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
             <div className="space-y-1.5"><Label>Descripción</Label><Input placeholder="Descripción breve..." {...register('description')} /></div>
             <div className="space-y-1.5">
               <Label>Categoría</Label>
-              <Input placeholder="Indumentaria, Accesorios..." list="cats-list" {...register('category')} />
-              <datalist id="cats-list">{CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
+              <Controller
+                name="category"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccioná una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5"><Label>Precio ($) *</Label><Input type="number" step="0.01" placeholder="0.00" {...register('price')} className={errors.price ? 'border-red-400' : ''} />{errors.price && <p className="text-xs text-red-500">{errors.price.message}</p>}</div>
@@ -513,10 +528,26 @@ function CajaTab({ isGerente }: { isGerente: boolean }) {
       await closeReg.mutateAsync({ id: reg.id, actual_total: closeActualTotal, notes: closeNotes || undefined })
       const diff = closeActualTotal - Number(reg.expected_total)
       const diffMsg = diff === 0 ? 'Cuadra perfecto' : diff > 0 ? `Sobrante: +${ARS(diff)}` : `Faltante: ${ARS(diff)}`
+      const closedShift = closingShift
       setClosingShift(null)
       setCloseActualTotal(0)
       setCloseNotes('')
-      showToast(`Caja turno ${closingShift} cerrada. ${diffMsg}`)
+      showToast(`Caja turno ${closedShift} cerrada. ${diffMsg} — Generando PDF...`)
+      // Descargar PDF de cierre
+      try {
+        await downloadCashRegisterPDF({
+          shift: closedShift,
+          date: data?.today ?? new Date().toISOString().split('T')[0],
+          expectedTotal: Number(reg.expected_total),
+          actualTotal: closeActualTotal,
+          difference: diff,
+          notes: closeNotes || undefined,
+          salesTotal: stats.sales_total,
+          paymentsTotal: stats.payments_total,
+        })
+      } catch {
+        // PDF failure is non-critical — no interrumpir el flujo
+      }
     } catch (err) {
       setCloseError(err instanceof Error ? err.message : 'Error al cerrar la caja')
     } finally {

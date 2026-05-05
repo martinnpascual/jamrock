@@ -19,6 +19,7 @@ import {
   MapPin,
   FileText,
   ShoppingCart,
+  TrendingUp,
 } from 'lucide-react'
 import { MEMBER_TYPE_LABELS, REPROCANN_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
@@ -73,6 +74,17 @@ export default async function MemberDetailPage({
   const isReprocannExpired =
     member.reprocann_expiry && new Date(member.reprocann_expiry) < new Date()
 
+  // Calcular total de gramos dispensados este mes
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const gramsThisMonth = dispensas
+    .filter(d => d.type !== 'anulacion' && new Date(d.created_at) >= startOfMonth)
+    .reduce((sum, d) => sum + (d.quantity_grams ?? 0), 0)
+  const gramsTotal = dispensas
+    .filter(d => d.type !== 'anulacion')
+    .reduce((sum, d) => sum + (d.quantity_grams ?? 0), 0)
+  const monthName = now.toLocaleDateString('es-AR', { month: 'long' })
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Breadcrumb + acciones */}
@@ -107,12 +119,12 @@ export default async function MemberDetailPage({
         {/* Columna izquierda: info principal + QR */}
         <div className="space-y-4">
           {/* Card principal */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-sm border-white/[0.06]">
             <CardContent className="pt-6 pb-4 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold text-green-700">
+              <div className="w-16 h-16 bg-[#2DC814]/10 rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold text-[#2DC814]">
                 {member.first_name.charAt(0)}{member.last_name.charAt(0)}
               </div>
-              <h2 className="text-lg font-bold text-slate-800">{fullName}</h2>
+              <h2 className="text-lg font-bold text-foreground">{fullName}</h2>
               <p className="font-mono text-sm text-slate-500 mt-0.5">{member.member_number}</p>
               <div className="mt-3">
                 <StatusBadge status={member.reprocann_status as ReprocannStatus} />
@@ -124,9 +136,9 @@ export default async function MemberDetailPage({
           </Card>
 
           {/* QR Card */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-sm border-white/[0.06]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <QrCode className="w-4 h-4" />
                 Código QR
               </CardTitle>
@@ -134,7 +146,7 @@ export default async function MemberDetailPage({
             <CardContent className="flex flex-col items-center gap-2 pb-5">
               {member.qr_code ? (
                 <>
-                  <MemberQR value={member.qr_code} size={150} className="rounded-lg border border-slate-100 p-2" />
+                  <MemberQR value={member.qr_code} size={150} className="rounded-lg border border-white/[0.08] p-2 bg-white" />
                   <p className="text-xs text-slate-400 font-mono">{member.qr_code}</p>
                 </>
               ) : (
@@ -147,9 +159,9 @@ export default async function MemberDetailPage({
         {/* Columna derecha: datos + historial */}
         <div className="lg:col-span-2 space-y-4">
           {/* Datos personales */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-sm border-white/[0.06]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-700">Datos personales</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-300">Datos personales</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <InfoRow label="DNI" value={member.dni} />
@@ -180,9 +192,9 @@ export default async function MemberDetailPage({
           </Card>
 
           {/* REPROCANN */}
-          <Card className={`shadow-sm border ${isReprocannExpired ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}>
+          <Card className={`shadow-sm border ${isReprocannExpired ? 'border-red-800/40 bg-red-950/20' : 'border-white/[0.06]'}`}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center justify-between">
                 <span>Estado REPROCANN</span>
                 <StatusBadge status={member.reprocann_status as ReprocannStatus} />
               </CardTitle>
@@ -198,7 +210,7 @@ export default async function MemberDetailPage({
               />
               {isReprocannExpired && (
                 <div className="sm:col-span-2">
-                  <p className="text-xs text-red-600 font-medium">
+                  <p className="text-xs text-red-400 font-medium">
                     ⚠️ REPROCANN vencido — el socio no puede recibir dispensas
                   </p>
                 </div>
@@ -208,48 +220,73 @@ export default async function MemberDetailPage({
 
           {/* Notas */}
           {member.notes && (
-            <Card className="shadow-sm border-slate-200">
+            <Card className="shadow-sm border-white/[0.06]">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Notas
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-slate-600 whitespace-pre-line">{member.notes}</p>
+                <p className="text-sm text-slate-400 whitespace-pre-line">{member.notes}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Historial dispensas */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-sm border-white/[0.06]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                 <Syringe className="w-4 h-4" />
                 Dispensas recientes
                 <span className="ml-auto text-xs font-normal text-slate-400">
-                  {dispensas.length} registros
+                  {dispensas.filter(d => d.type !== 'anulacion').length} registros
                 </span>
               </CardTitle>
             </CardHeader>
+            {/* Resumen del mes */}
+            {dispensas.length > 0 && (
+              <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+                <div className="bg-[#2DC814]/5 border border-[#2DC814]/15 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide">Este mes ({monthName})</p>
+                  <p className="text-lg font-bold text-[#2DC814] leading-tight mt-0.5">{gramsThisMonth}g</p>
+                </div>
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                    <TrendingUp className="w-2.5 h-2.5" />
+                    Total histórico
+                  </p>
+                  <p className="text-lg font-bold text-slate-300 leading-tight mt-0.5">{gramsTotal}g</p>
+                </div>
+              </div>
+            )}
             <CardContent className="p-0">
               {dispensas.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-6">Sin dispensas registradas</p>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-white/[0.04]">
                   {dispensas.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div key={d.id} className={cn(
+                      'flex items-center justify-between px-4 py-2.5',
+                      d.type === 'anulacion' && 'opacity-50'
+                    )}>
                       <div>
-                        <p className="text-xs font-medium text-slate-700">
-                          {d.quantity_grams}g — {d.genetics}
+                        <p className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                          {d.type === 'anulacion'
+                            ? <span className="text-red-400 line-through">{d.quantity_grams}g — {d.genetics}</span>
+                            : <>{d.quantity_grams}g — {d.genetics}</>
+                          }
+                          {d.type === 'anulacion' && (
+                            <span className="text-[10px] bg-red-950/60 text-red-400 px-1 rounded">ANULADA</span>
+                          )}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-500">
                           {new Date(d.created_at).toLocaleDateString('es-AR', {
                             day: '2-digit', month: 'short', year: 'numeric',
                           })}
                         </p>
                       </div>
-                      <span className="font-mono text-xs text-slate-400">{d.dispensation_number}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{d.dispensation_number}</span>
                     </div>
                   ))}
                 </div>
@@ -258,9 +295,9 @@ export default async function MemberDetailPage({
           </Card>
 
           {/* Historial pagos */}
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-sm border-white/[0.06]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                 <CreditCard className="w-4 h-4" />
                 Pagos recientes
                 <span className="ml-auto text-xs font-normal text-slate-400">
@@ -272,16 +309,16 @@ export default async function MemberDetailPage({
               {pagos.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-6">Sin pagos registrados</p>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-white/[0.04]">
                   {pagos.map((p) => (
                     <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
                       <div>
-                        <p className="text-xs font-medium text-slate-700">${p.amount_ars.toLocaleString('es-AR')}</p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs font-medium text-slate-200">{ARS(p.amount_ars)}</p>
+                        <p className="text-xs text-slate-500">
                           {p.concept} · {p.payment_method ? PAYMENT_METHOD_LABELS[p.payment_method] : ''}
                         </p>
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500">
                         {new Date(p.created_at).toLocaleDateString('es-AR', {
                           day: '2-digit', month: 'short',
                         })}
@@ -295,9 +332,9 @@ export default async function MemberDetailPage({
 
           {/* Transacciones checkout */}
           {transacciones.length > 0 && (
-            <Card className="shadow-sm border-slate-200">
+            <Card className="shadow-sm border-white/[0.06]">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                   <ShoppingCart className="w-4 h-4" />
                   Transacciones recientes
                   <span className="ml-auto text-xs font-normal text-slate-400">
@@ -306,24 +343,24 @@ export default async function MemberDetailPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-white/[0.04]">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {transacciones.map((t: any) => (
                     <div key={t.transaction_number} className="flex items-center justify-between px-4 py-2.5">
                       <div>
-                        <p className="text-xs font-medium text-slate-700 font-mono">{t.transaction_number}</p>
+                        <p className="text-xs font-medium text-slate-300 font-mono">{t.transaction_number}</p>
                         <span className={cn(
                           'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
                           t.payment_status === 'pagado'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-amber-100 text-amber-700'
+                            ? 'bg-[#2DC814]/15 text-[#2DC814]'
+                            : 'bg-amber-900/40 text-amber-400'
                         )}>
                           {t.payment_status === 'pagado' ? 'Pagado' : 'Fiado'}
                         </span>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-700">{ARS(t.total_amount)}</p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-sm font-semibold text-slate-200">{ARS(t.total_amount)}</p>
+                        <p className="text-xs text-slate-500">
                           {new Date(t.created_at).toLocaleDateString('es-AR', {
                             day: '2-digit', month: 'short',
                           })}
@@ -360,10 +397,10 @@ function InfoRow({
 }) {
   return (
     <div>
-      <p className="text-xs text-slate-400 mb-0.5">{label}</p>
-      <p className="text-sm text-slate-700 flex items-center gap-1.5">
+      <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+      <p className="text-sm text-slate-300 flex items-center gap-1.5">
         {icon}
-        {value || <span className="text-slate-300 italic">—</span>}
+        {value || <span className="text-slate-600 italic">—</span>}
       </p>
     </div>
   )

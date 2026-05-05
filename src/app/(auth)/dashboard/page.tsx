@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, Syringe, ClipboardList, AlertTriangle, ArrowRight, Clock, ArrowDownUp, ShoppingCart, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { ReprocannAlertBanner } from '@/components/shared/ReprocannAlertBanner'
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -194,6 +195,9 @@ export default async function DashboardPage() {
           />
         )}
       </div>
+
+      {/* Banner REPROCANN — visible para gerente y secretaria */}
+      {(profile?.role === 'gerente' || profile?.role === 'secretaria') && <ReprocannAlertBanner />}
 
       {/* Alertas — solo gerente */}
       {isGerente && alerts.length > 0 && (
