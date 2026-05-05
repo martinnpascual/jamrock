@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { productSchema, saleSchema, CATEGORIES, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
-import { useProducts, useCreateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
+import { productSchema, saleSchema, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
+import { useProducts, useCreateProduct, useDeleteProduct, useUpdateProduct, type Product } from '@/hooks/useProducts'
+import { useProductCategories, useUpdateProductCategories } from '@/hooks/useProductCategories'
 import { useSales, useCreateSale, useDeleteSale } from '@/hooks/useSales'
 import { useTodayCashRegister, useOpenCashRegister, useCloseCashRegister, useReopenCashRegister, type CashRegister } from '@/hooks/useCashRegister'
 import { useMembers } from '@/hooks/useMembers'
@@ -22,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw, TrendingDown, Receipt } from 'lucide-react'
+import { ShoppingCart, Package, DollarSign, Plus, Loader2, Trash2, AlertTriangle, CheckCircle, Lock, Sun, Moon, RotateCcw, TrendingDown, Receipt, Settings, X, Pencil } from 'lucide-react'
 import { useCashExpenses, useCreateExpense, useDeleteExpense, EXPENSE_CATEGORIES, type ExpenseCategory } from '@/hooks/useCashExpenses'
 import { cn } from '@/lib/utils'
 import { downloadCashRegisterPDF } from '@/components/cash/CashRegisterPDF'
@@ -101,7 +102,7 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const selProd = products.find(p => p.id === pid)
   async function onSubmit(data: SaleFormData) {
     try {
-      await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price || 0 })
+      await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price_basico || 0 })
       reset()
       setSelectedMemberId(null)
       setOpen(false)
@@ -184,9 +185,9 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Producto *</Label>
-              <Select value={pid ?? ''} onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', p.price) }}>
+              <Select value={pid ?? ''} onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', p.price_basico) }}>
                 <SelectTrigger className={errors.product_id ? 'border-red-400' : ''}><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
-                <SelectContent>{products.filter(p => p.stock_quantity > 0).map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {ARS(p.price)} ({p.stock_quantity} disp.)</SelectItem>)}</SelectContent>
+                <SelectContent>{products.filter(p => p.stock_quantity > 0).map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {ARS(p.price_basico)} ({p.stock_quantity} disp.)</SelectItem>)}</SelectContent>
               </Select>
               {errors.product_id && <p className="text-xs text-red-500">{errors.product_id.message}</p>}
             </div>
@@ -249,15 +250,76 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
 
 function ProductosTab({ isGerente }: { isGerente: boolean }) {
   const { data: products = [], isLoading } = useProducts()
+  const { data: categories = [], isLoading: catsLoading } = useProductCategories()
+  const updateCategories = useUpdateProductCategories()
   const createProduct = useCreateProduct()
   const deleteProduct = useDeleteProduct()
   const [open, setOpen] = useState(false)
+  const [catManagerOpen, setCatManagerOpen] = useState(false)
   const [confirmDeleteProd, setConfirmDeleteProd] = useState<{ id: string; name: string } | null>(null)
+  // Category manager state
+  const [editingCategories, setEditingCategories] = useState<string[]>([])
+  const [newCatInput, setNewCatInput] = useState('')
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editingValue, setEditingValue] = useState('')
+  const [catError, setCatError] = useState('')
+
   const low = products.filter(p => p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold).length
   const empty = products.filter(p => p.stock_quantity === 0).length
   const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
   })
+
+  function openCatManager() {
+    setEditingCategories([...categories])
+    setNewCatInput('')
+    setEditingIdx(null)
+    setEditingValue('')
+    setCatError('')
+    setCatManagerOpen(true)
+  }
+
+  function addCategory() {
+    const trimmed = newCatInput.trim()
+    if (!trimmed) { setCatError('Ingresá un nombre'); return }
+    if (trimmed.length > 50) { setCatError('Máximo 50 caracteres'); return }
+    if (editingCategories.includes(trimmed)) { setCatError('Ya existe esa categoría'); return }
+    setEditingCategories(prev => [...prev, trimmed])
+    setNewCatInput('')
+    setCatError('')
+  }
+
+  function removeCategory(idx: number) {
+    setEditingCategories(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function startEdit(idx: number) {
+    setEditingIdx(idx)
+    setEditingValue(editingCategories[idx])
+    setCatError('')
+  }
+
+  function confirmEdit(idx: number) {
+    const trimmed = editingValue.trim()
+    if (!trimmed) { setCatError('El nombre no puede estar vacío'); return }
+    if (trimmed.length > 50) { setCatError('Máximo 50 caracteres'); return }
+    if (editingCategories.some((c, i) => c === trimmed && i !== idx)) { setCatError('Ya existe esa categoría'); return }
+    setEditingCategories(prev => prev.map((c, i) => i === idx ? trimmed : c))
+    setEditingIdx(null)
+    setEditingValue('')
+    setCatError('')
+  }
+
+  async function saveCategories() {
+    setCatError('')
+    try {
+      await updateCategories.mutateAsync(editingCategories)
+      setCatManagerOpen(false)
+    } catch (err) {
+      setCatError(err instanceof Error ? err.message : 'Error al guardar')
+    }
+  }
+
   async function onSubmit(data: ProductFormData) {
     try {
       await createProduct.mutateAsync(data)
@@ -265,6 +327,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
       setOpen(false)
     } catch { /* error shown via createProduct.error */ }
   }
+
   if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
   return (
     <div className="space-y-4">
@@ -273,10 +336,21 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
         <div className="bg-amber-900/20 border border-white/[0.06] rounded-lg p-3 sm:p-4"><p className="text-xs text-slate-500">Stock bajo</p><p className="text-xl sm:text-2xl font-bold text-amber-400 mt-1">{low}</p></div>
         <div className="bg-red-950/40 border border-white/[0.06] rounded-lg p-3 sm:p-4"><p className="text-xs text-slate-500">Sin stock</p><p className="text-xl sm:text-2xl font-bold text-red-400 mt-1">{empty}</p></div>
       </div>
-      {isGerente && <div className="flex justify-end"><Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10"><Plus className="w-4 h-4" />Nuevo producto</Button></div>}
+      {isGerente && (
+        <div className="flex justify-end gap-2">
+          <Button onClick={openCatManager} variant="outline" className="gap-2 h-10 border-white/10 text-slate-400 hover:text-slate-200">
+            <Settings className="w-4 h-4" />Categorías
+          </Button>
+          <Button onClick={() => setOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2 h-10">
+            <Plus className="w-4 h-4" />Nuevo producto
+          </Button>
+        </div>
+      )}
       {products.length === 0
         ? <div className="flex flex-col items-center py-16"><Package className="w-10 h-10 text-slate-300 mb-3" /><p className="text-sm text-slate-500">{isGerente ? 'Cargá el primer producto.' : 'El gerente debe cargar productos.'}</p></div>
         : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.map(p => <ProductCard key={p.id} product={p} isGerente={isGerente} onDelete={() => setConfirmDeleteProd({ id: p.id, name: p.name })} />)}</div>}
+
+      {/* Dialog: Nuevo producto */}
       <Dialog open={open} onOpenChange={o => { if (!o) { reset(); setOpen(false) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Nuevo producto</DialogTitle></DialogHeader>
@@ -289,12 +363,12 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
                 name="category"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                  <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={catsLoading}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccioná una categoría" />
+                      <SelectValue placeholder={catsLoading ? 'Cargando...' : 'Seleccioná una categoría'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map(c => (
+                      {categories.map(c => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
@@ -303,7 +377,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
               />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5"><Label>Precio ($) *</Label><Input type="number" step="0.01" placeholder="0.00" {...register('price')} className={errors.price ? 'border-red-400' : ''} />{errors.price && <p className="text-xs text-red-500">{errors.price.message}</p>}</div>
+              <div className="space-y-1.5"><Label>Precio ($) *</Label><Input type="number" step="0.01" placeholder="0.00" {...register('price_basico')} className={errors.price_basico ? 'border-red-400' : ''} />{errors.price_basico && <p className="text-xs text-red-500">{errors.price_basico.message}</p>}</div>
               <div className="space-y-1.5"><Label>Stock inicial</Label><Input type="number" min={0} {...register('stock_quantity')} /></div>
               <div className="space-y-1.5"><Label>Alerta bajo</Label><Input type="number" min={0} {...register('low_stock_threshold')} /></div>
             </div>
@@ -317,6 +391,65 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog: Gestionar categorías */}
+      <Dialog open={catManagerOpen} onOpenChange={o => { if (!o && !updateCategories.isPending) setCatManagerOpen(false) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Settings className="w-4 h-4" />Gestionar categorías</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {/* Lista de categorías existentes */}
+            <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              {editingCategories.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-3">Sin categorías</p>
+              )}
+              {editingCategories.map((cat, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  {editingIdx === idx ? (
+                    <>
+                      <Input
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmEdit(idx) } if (e.key === 'Escape') { setEditingIdx(null); setCatError('') } }}
+                        className="h-8 text-sm flex-1"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={() => confirmEdit(idx)} className="h-8 px-2 bg-green-600 hover:bg-green-700 text-white">OK</Button>
+                      <button onClick={() => { setEditingIdx(null); setCatError('') }} className="text-slate-500 hover:text-slate-300"><X className="w-4 h-4" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm text-slate-300 bg-white/[0.03] border border-white/[0.06] rounded px-3 py-1.5 truncate">{cat}</span>
+                      <button onClick={() => startEdit(idx)} className="text-slate-500 hover:text-slate-200 p-1"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => removeCategory(idx)} className="text-slate-500 hover:text-red-400 p-1"><X className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Agregar nueva categoría */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nueva categoría..."
+                value={newCatInput}
+                onChange={e => { setNewCatInput(e.target.value); setCatError('') }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCategory() } }}
+                className="h-9 text-sm flex-1"
+              />
+              <Button size="sm" onClick={addCategory} className="h-9 px-3 bg-green-600 hover:bg-green-700 text-white gap-1">
+                <Plus className="w-3.5 h-3.5" />Agregar
+              </Button>
+            </div>
+            {catError && <p className="text-xs text-red-500">{catError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatManagerOpen(false)} disabled={updateCategories.isPending}>Cancelar</Button>
+            <Button onClick={saveCategories} disabled={updateCategories.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+              {updateCategories.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : 'Guardar cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmación eliminar producto */}
       <Dialog open={!!confirmDeleteProd} onOpenChange={o => { if (!o && !deleteProduct.isPending) setConfirmDeleteProd(null) }}>
         <DialogContent className="sm:max-w-sm" showCloseButton={false}>
@@ -425,7 +558,7 @@ function ProductCard({ product: p, isGerente, onDelete }: { product: Product; is
         {isGerente && <button onClick={onDelete} className="text-slate-300 hover:text-red-400 ml-2"><Trash2 className="w-3.5 h-3.5" /></button>}
       </div>
       <div className="mt-3 flex items-end justify-between">
-        <p className="text-lg font-bold text-slate-100">{ARS(p.price)}</p>
+        <p className="text-lg font-bold text-slate-100">{ARS(p.price_basico)}</p>
         {isEmpty ? <Badge variant="outline" className="text-xs text-red-400 border-red-900/50 bg-red-950/40">Sin stock</Badge>
           : isLow ? <Badge variant="outline" className="text-xs text-amber-400 border-amber-800/50 bg-amber-950/40"><AlertTriangle className="w-3 h-3 mr-1" />{p.stock_quantity} u.</Badge>
           : <Badge variant="outline" className="text-xs text-[#2DC814] border-[#2DC814]/20 bg-[#2DC814]/10">{p.stock_quantity} u.</Badge>}

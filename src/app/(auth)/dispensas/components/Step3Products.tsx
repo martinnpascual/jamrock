@@ -86,7 +86,7 @@ export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-sm font-semibold text-[#2DC814]">{ARS(product.price)}</p>
+                    <p className="text-sm font-semibold text-[#2DC814]">{ARS(product.price_basico)}</p>
                     <span className="text-xs text-slate-500">·</span>
                     <p className={cn('text-xs', lowStock ? 'text-amber-400' : 'text-slate-500')}>
                       {product.stock_quantity} en stock
@@ -110,7 +110,7 @@ export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props
                     onClick={() => onAddToCart({
                       product_id:   product.id,
                       product_name: product.name,
-                      unit_price:   product.price,
+                      unit_price:   product.price_basico,
                     })}
                     className="w-8 h-8 rounded-lg bg-[#2DC814]/10 hover:bg-[#2DC814]/20 border border-[#2DC814]/20 flex items-center justify-center text-[#2DC814] transition-colors"
                   >
