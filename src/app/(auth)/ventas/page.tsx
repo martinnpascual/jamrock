@@ -266,7 +266,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
 
   const low = products.filter(p => p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold).length
   const empty = products.filter(p => p.stock_quantity === 0).length
-  const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
   })
 
@@ -323,6 +323,12 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   async function onSubmit(data: ProductFormData) {
     try {
       await createProduct.mutateAsync(data)
+      // Si ingresaron una categoría nueva (no está en la lista), auto-guardarla
+      if (data.category && !categories.includes(data.category)) {
+        try {
+          await updateCategories.mutateAsync([...categories, data.category])
+        } catch { /* no bloquear el flujo si falla el guardado de categoría */ }
+      }
       reset()
       setOpen(false)
     } catch { /* error shown via createProduct.error */ }
@@ -359,22 +365,16 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
             <div className="space-y-1.5"><Label>Descripción</Label><Input placeholder="Descripción breve..." {...register('description')} /></div>
             <div className="space-y-1.5">
               <Label>Categoría</Label>
-              <Controller
-                name="category"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={catsLoading}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={catsLoading ? 'Cargando...' : 'Seleccioná una categoría'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(c => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Input
+                list="cat-suggestions"
+                placeholder={catsLoading ? 'Cargando...' : 'Seleccioná o escribí una nueva...'}
+                {...register('category')}
+                autoComplete="off"
               />
+              <datalist id="cat-suggestions">
+                {categories.map(c => <option key={c} value={c} />)}
+              </datalist>
+              <p className="text-xs text-slate-500">Elegí de la lista o escribí una categoría nueva</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5"><Label>Precio ($) *</Label><Input type="number" step="0.01" placeholder="0.00" {...register('price_basico')} className={errors.price_basico ? 'border-red-400' : ''} />{errors.price_basico && <p className="text-xs text-red-500">{errors.price_basico.message}</p>}</div>

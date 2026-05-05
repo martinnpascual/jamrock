@@ -56,15 +56,20 @@ export function CartSummary({
         <div className="space-y-1">
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Dispensa medicinal</p>
           {dispensations.map((d, idx) => {
-            const discAmt = d.cost * ((d.discountPercent ?? 0) / 100)
+            const discAmt = d.discountFixedAmount ?? d.cost * ((d.discountPercent ?? 0) / 100)
             const itemTotal = d.cost - discAmt
+            const discLabel = d.discountFixedAmount != null
+              ? `−${ARS(d.discountFixedAmount)} desc.`
+              : d.discountPercent > 0
+                ? `${d.discountPercent}% desc.`
+                : ''
             return (
               <div key={idx} className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-slate-200 truncate">{d.genetics}</p>
                   <p className="text-xs text-slate-500">
                     {d.quantity_grams}g
-                    {d.discountPercent > 0 && ` · ${d.discountPercent}% desc.`}
+                    {discLabel && ` · ${discLabel}`}
                   </p>
                 </div>
                 <p className={cn('text-sm font-semibold flex-shrink-0',

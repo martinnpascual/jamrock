@@ -14,12 +14,13 @@ export interface CartItem {
 }
 
 export interface DispensationInput {
-  lot_id:           string
-  genetics:         string
-  quantity_grams:   number
-  notes:            string
-  cost:             number  // subtotal: gramos × price_per_gram (antes de descuento)
-  discountPercent:  number  // 0 | 5 | 10 | 15 | 20 | 25
+  lot_id:               string
+  genetics:             string
+  quantity_grams:       number
+  notes:                string
+  cost:                 number  // subtotal: gramos × price_per_gram (antes de descuento)
+  discountPercent:      number  // 0–100, puede ser cualquier número
+  discountFixedAmount?: number  // si el descuento fue ingresado en pesos (para display)
 }
 
 export type CCMode = 'fiado' | 'saldo'

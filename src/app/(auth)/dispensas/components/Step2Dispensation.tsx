@@ -16,6 +16,7 @@ const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 const DISCOUNT_OPTIONS = [5, 10, 15, 20, 25] as const
+type DiscountMode = 'percent' | 'fixed'
 
 interface Step2Props {
   config:                 DispensationConfig | undefined
@@ -35,8 +36,11 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
   const [gramsStr, setGramsStr]           = useState('')
   const [notes, setNotes]                 = useState('')
   const [error, setError]                 = useState<string | null>(null)
-  const [discountPercent, setDiscount]    = useState<0 | 5 | 10 | 15 | 20 | 25>(0)
-  const [applyDiscount, setApplyDiscount] = useState(false)
+  const [discountPercent, setDiscount]      = useState<number>(0)
+  const [applyDiscount, setApplyDiscount]   = useState(false)
+  const [discountMode, setDiscountMode]     = useState<DiscountMode>('percent')
+  const [customPctStr, setCustomPctStr]     = useState('')   // input libre de porcentaje
+  const [fixedAmountStr, setFixedAmountStr] = useState('')   // input monto fijo en $
 
   const activeLots = useMemo(
     () => lots.filter(l => !l.is_deleted && l.current_grams > 0),
@@ -61,12 +65,34 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
     ? selectedLot.price_per_gram
     : (config?.enabled ? config.pricePerGram : 0)
   const subtotal     = pricePerGram * gramsNum
-  const activeDiscount = applyDiscount ? discountPercent : 0
-  const discountAmount = subtotal * (activeDiscount / 100)
+
+  // Monto fijo parseado
+  const fixedAmountNum = parseFloat(fixedAmountStr) || 0
+  // Porcentaje efectivo para cálculo
+  const activeDiscount = applyDiscount
+    ? (discountMode === 'fixed' ? 0 : discountPercent)
+    : 0
+  // Monto de descuento: en modo fijo usa el monto ingresado; en % usa el porcentaje
+  const discountAmount = applyDiscount
+    ? (discountMode === 'fixed'
+        ? Math.min(fixedAmountNum, subtotal)
+        : subtotal * (activeDiscount / 100))
+    : 0
   const totalFinal   = subtotal - discountAmount
 
-  // Reset descuento al deshabilitar
-  useEffect(() => { if (!applyDiscount) setDiscount(0) }, [applyDiscount])
+  // Reset descuento al deshabilitar o cambiar modo
+  useEffect(() => {
+    if (!applyDiscount) {
+      setDiscount(0)
+      setCustomPctStr('')
+      setFixedAmountStr('')
+    }
+  }, [applyDiscount])
+  useEffect(() => {
+    setDiscount(0)
+    setCustomPctStr('')
+    setFixedAmountStr('')
+  }, [discountMode])
 
   // Si solo hay un lote, pre-seleccionar
   useEffect(() => {
@@ -82,13 +108,19 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
       setError(`Stock insuficiente. Disponible: ${availableGrams.toFixed(1)}g`)
       return null
     }
+    const effectivePct = applyDiscount && discountMode === 'fixed' && subtotal > 0
+      ? (Math.min(fixedAmountNum, subtotal) / subtotal) * 100
+      : activeDiscount
     return {
-      lot_id:          lotId,
-      genetics:        selectedLot.genetics,
-      quantity_grams:  gramsNum,
+      lot_id:               lotId,
+      genetics:             selectedLot.genetics,
+      quantity_grams:       gramsNum,
       notes,
-      cost:            subtotal,
-      discountPercent: activeDiscount,
+      cost:                 subtotal,
+      discountPercent:      effectivePct,
+      ...(applyDiscount && discountMode === 'fixed' && fixedAmountNum > 0
+        ? { discountFixedAmount: Math.min(fixedAmountNum, subtotal) }
+        : {}),
     }
   }
 
@@ -101,7 +133,10 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
     setGramsStr('')
     setNotes('')
     setDiscount(0)
+    setCustomPctStr('')
+    setFixedAmountStr('')
     setApplyDiscount(false)
+    setDiscountMode('percent')
     setError(null)
   }
 
@@ -131,8 +166,13 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Genéticas agregadas</p>
           <div className="space-y-1.5">
             {addedItems.map((item, idx) => {
-              const itemDiscount = item.cost * ((item.discountPercent ?? 0) / 100)
+              const itemDiscount = item.discountFixedAmount ?? item.cost * ((item.discountPercent ?? 0) / 100)
               const itemTotal = item.cost - itemDiscount
+              const itemDiscLabel = item.discountFixedAmount != null
+                ? `−${ARS(item.discountFixedAmount)} desc.`
+                : item.discountPercent > 0
+                  ? `${item.discountPercent}% desc.`
+                  : ''
               return (
                 <div
                   key={idx}
@@ -142,7 +182,7 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
                     <p className="text-sm text-slate-200 truncate">{item.genetics}</p>
                     <p className="text-xs text-slate-500">
                       {item.quantity_grams}g
-                      {item.discountPercent > 0 && ` · ${item.discountPercent}% desc.`}
+                      {itemDiscLabel && ` · ${itemDiscLabel}`}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-slate-100 flex-shrink-0">
@@ -248,29 +288,108 @@ export function Step2Dispensation({ config, initialDispensations, onOnlyDispense
             </button>
 
             {applyDiscount && (
-              <div className="flex flex-wrap gap-2">
-                {DISCOUNT_OPTIONS.map(pct => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => setDiscount(pct)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-sm font-semibold border transition-all',
-                      discountPercent === pct
-                        ? 'bg-amber-500 border-amber-500 text-black'
-                        : 'border-white/10 text-slate-400 hover:border-amber-500/50 hover:text-amber-400'
+              <div className="space-y-3">
+                {/* Toggle % / $ */}
+                <div className="flex gap-1 bg-white/5 rounded-lg p-1 border border-white/[0.06] w-fit">
+                  {(['percent', 'fixed'] as DiscountMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setDiscountMode(mode)}
+                      className={cn(
+                        'px-3 py-1 rounded-md text-xs font-semibold transition-all',
+                        discountMode === mode
+                          ? 'bg-amber-500 text-black shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      )}
+                    >
+                      {mode === 'percent' ? '% Porcentaje' : '$ Monto fijo'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Modo porcentaje */}
+                {discountMode === 'percent' && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {DISCOUNT_OPTIONS.map(pct => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => { setDiscount(pct); setCustomPctStr('') }}
+                          className={cn(
+                            'px-3 py-1 rounded-full text-sm font-semibold border transition-all',
+                            discountPercent === pct && !customPctStr
+                              ? 'bg-amber-500 border-amber-500 text-black'
+                              : 'border-white/10 text-slate-400 hover:border-amber-500/50 hover:text-amber-400'
+                          )}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                    {/* Input porcentaje libre */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-32">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          placeholder="Otro %"
+                          value={customPctStr}
+                          onChange={e => {
+                            setCustomPctStr(e.target.value)
+                            const v = parseFloat(e.target.value)
+                            if (!isNaN(v) && v >= 0 && v <= 100) setDiscount(v)
+                          }}
+                          className="h-8 pr-7 text-sm"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                      </div>
+                      {customPctStr && <span className="text-xs text-slate-500">= {ARS(subtotal * (parseFloat(customPctStr) || 0) / 100)} de descuento</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modo monto fijo */}
+                {discountMode === 'fixed' && (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={subtotal}
+                        step={100}
+                        placeholder="Ej: 1000"
+                        value={fixedAmountStr}
+                        onChange={e => setFixedAmountStr(e.target.value)}
+                        className="h-10 pl-7 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    {fixedAmountNum > 0 && subtotal > 0 && (
+                      <p className="text-xs text-slate-500">
+                        Equivale al {((Math.min(fixedAmountNum, subtotal) / subtotal) * 100).toFixed(1)}% de descuento
+                      </p>
                     )}
-                  >
-                    {pct}%
-                  </button>
-                ))}
+                    {fixedAmountNum > subtotal && subtotal > 0 && (
+                      <p className="text-xs text-amber-400">El descuento no puede superar el subtotal. Se aplicará {ARS(subtotal)}.</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {applyDiscount && discountPercent > 0 && (
+            {applyDiscount && discountAmount > 0 && (
               <div className="flex justify-between items-center text-sm text-amber-400">
-                <span>Descuento {discountPercent}%</span>
-                <span>- {ARS(discountAmount)}</span>
+                <span>
+                  Descuento{discountMode === 'fixed'
+                    ? ` fijo`
+                    : ` ${discountPercent}%`}
+                </span>
+                <span>− {ARS(discountAmount)}</span>
               </div>
             )}
 
