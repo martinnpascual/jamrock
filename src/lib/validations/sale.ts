@@ -4,7 +4,7 @@ export const productSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(150),
   description: z.string().max(300).optional().or(z.literal('')),
   category: z.string().max(50).optional().or(z.literal('')),
-  price: z.coerce.number().positive('Debe ser mayor a 0').max(1000000),
+  price_basico: z.coerce.number().positive('Debe ser mayor a 0').max(1000000),
   stock_quantity: z.coerce.number().int().nonnegative().max(100000),
   low_stock_threshold: z.coerce.number().int().nonnegative().max(1000),
 })

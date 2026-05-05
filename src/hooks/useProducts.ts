@@ -6,7 +6,8 @@ import type { ProductFormData } from '@/lib/validations/sale'
 
 export type Product = {
   id: string; name: string; description: string | null; category: string | null
-  price: number; stock_quantity: number; low_stock_threshold: number
+  price_basico: number; price_no_delega: number | null; price_administrativo: number | null; price_autoridad: number | null
+  stock_quantity: number; low_stock_threshold: number
   created_at: string; is_deleted: boolean
 }
 

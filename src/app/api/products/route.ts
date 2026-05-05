@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
   const parsed = productSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 422 })
 
-  const { name, description, category, price, stock_quantity, low_stock_threshold } = parsed.data
+  const { name, description, category, price_basico, stock_quantity, low_stock_threshold } = parsed.data
   const admin = createAdminClient()
 
   const { data, error } = await admin.from('commercial_products').insert({
-    name, price, stock_quantity,
+    name, price_basico, stock_quantity,
     description: description || null,
     category: category || null,
     low_stock_threshold: low_stock_threshold ?? 5,
