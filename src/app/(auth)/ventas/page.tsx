@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema, saleSchema, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
-import { useProducts, useCreateProduct, useDeleteProduct, useUpdateProduct, type Product } from '@/hooks/useProducts'
+import { useProducts, useCreateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
 import { useProductCategories, useUpdateProductCategories } from '@/hooks/useProductCategories'
 import { useSales, useCreateSale, useDeleteSale } from '@/hooks/useSales'
 import { useTodayCashRegister, useOpenCashRegister, useCloseCashRegister, useReopenCashRegister, type CashRegister } from '@/hooks/useCashRegister'
