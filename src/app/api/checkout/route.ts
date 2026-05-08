@@ -81,24 +81,6 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1b-3. Bloquear si el socio tiene deuda en cuenta corriente
-  {
-    const { data: ccAccount } = await admin
-      .from('current_accounts')
-      .select('balance')
-      .eq('member_id', member_id)
-      .eq('is_deleted', false)
-      .single()
-
-    if (ccAccount && ccAccount.balance < 0) {
-      const deuda = Math.abs(Number(ccAccount.balance)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-      return NextResponse.json(
-        { error: `El socio tiene una deuda de $${deuda} en cuenta corriente. Debe regularizarla antes de poder dispensar.` },
-        { status: 422 }
-      )
-    }
-  }
-
   // 1b-2. Obtener condición del socio para registrarla en la dispensa
   const { data: memberFull } = await admin
     .from('members')
