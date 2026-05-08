@@ -507,7 +507,7 @@ export async function POST(request: NextRequest) {
           .from('payments')
           .insert({
             member_id,
-            amount:         paidAmount,
+            amount_ars:     paidAmount,
             concept:        'dispensa',
             payment_method: payment.method,
             notes:          paymentNotes,
