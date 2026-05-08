@@ -78,6 +78,9 @@ export function CheckoutWizard() {
     isProcessing, error, result,
   } = checkout
 
+  // Solo "Delegación por Sistema Vigente" puede pagar por transferencia
+  const allowTransfer = member?.condicion === 'delegacion_sistema_vigente'
+
   // Mostrar carrito lateral solo en steps 2-4 y cuando haya algo para mostrar
   const showCart = currentStep >= 2 && currentStep <= 4
 
@@ -120,6 +123,7 @@ export function CheckoutWizard() {
           {currentStep === 3 && (
             <Step3Products
               cartItems={cartItems}
+              member={member}
               onAddToCart={checkout.addToCart}
               onContinue={() => checkout.goToStep(4)}
             />
@@ -130,6 +134,7 @@ export function CheckoutWizard() {
               total={total}
               memberCCBalance={memberCCBalance}
               allowCredit={config?.allowCredit ?? true}
+              allowTransfer={allowTransfer}
               showCCBalance={config?.showCCBalance ?? true}
               paymentMethod={paymentMethod}
               ccMode={checkout.ccMode}

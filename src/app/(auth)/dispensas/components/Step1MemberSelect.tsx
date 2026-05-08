@@ -6,9 +6,22 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { QRCameraScanner } from '@/components/shared/QRCameraScanner'
-import { Search, QrCode, Loader2, AlertTriangle, ChevronRight, User } from 'lucide-react'
+import { Search, QrCode, Loader2, AlertTriangle, ChevronRight, User, ArrowLeftRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Member, ReprocannStatus } from '@/types/database'
+import type { Member, ReprocannStatus, Condicion } from '@/types/database'
+
+const CONDICION_LABELS: Record<Condicion, string> = {
+  delegacion_sistema_vigente:     'Delegación por Sistema Vigente',
+  delegacion_sistema_en_tramite:  'Sistema en Trámite',
+  delegacion_sistema_pendiente:   'Sistema Pendiente',
+  delegacion_contrato_vigente:    'Delegación por Contrato Vigente',
+  reiniciar:                      'Reiniciar',
+  no_delega:                      'No Delega',
+  no_tramita_reprocann:           'Sin REPROCANN',
+  reprocann_vencido:              'REPROCANN Vencido',
+  asociado_baja:                  'Dado de Baja',
+  no_aplica:                      'No Aplica',
+}
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -180,6 +193,20 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
               </div>
             </div>
             <StatusBadge status={selected.reprocann_status as ReprocannStatus} />
+          </div>
+
+          {/* Condición del socio */}
+          <div className="flex items-center justify-between text-xs px-1">
+            <span className="text-slate-400">Condición</span>
+            <span className={cn(
+              'font-medium flex items-center gap-1',
+              selected.condicion === 'delegacion_sistema_vigente' ? 'text-[#2DC814]' :
+              selected.condicion === 'delegacion_contrato_vigente' ? 'text-sky-400' :
+              'text-amber-400'
+            )}>
+              {selected.condicion === 'delegacion_sistema_vigente' && <ArrowLeftRight className="w-3 h-3" />}
+              {CONDICION_LABELS[selected.condicion] ?? selected.condicion}
+            </span>
           </div>
 
           {ccBalance !== 0 && (

@@ -17,6 +17,7 @@ interface Step4Props {
   total:                    number
   memberCCBalance:          number
   allowCredit:              boolean
+  allowTransfer:            boolean
   showCCBalance:            boolean
   paymentMethod:            PaymentMethod | null
   ccMode:                   CCMode | null
@@ -50,6 +51,7 @@ export function Step4Payment({
   total,
   memberCCBalance,
   allowCredit,
+  allowTransfer,
   showCCBalance,
   paymentMethod,
   ccMode,
@@ -72,9 +74,11 @@ export function Step4Payment({
   onBack,
 }: Step4Props) {
 
-  const visibleMethods = METHODS.filter(m =>
-    m.key !== 'cuenta_corriente' || allowCredit
-  )
+  const visibleMethods = METHODS.filter(m => {
+    if (m.key === 'cuenta_corriente') return allowCredit
+    if (m.key === 'transferencia' || m.key === 'mixto') return allowTransfer
+    return true
+  })
 
   // Para mixto (3 vías): la suma total cubierta
   const totalCubierto = paymentMethod === 'mixto'
@@ -135,6 +139,14 @@ export function Step4Payment({
           Total a cobrar: <span className="font-bold text-[#2DC814]">{total === 0 ? 'Gratis' : ARS(total)}</span>
         </p>
       </div>
+
+      {/* Info: método de pago según condición del socio */}
+      {!allowTransfer && (
+        <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg px-3 py-2.5 text-xs text-amber-300/80">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <span>Este socio no tiene <strong className="text-amber-300">Delegación por Sistema Vigente</strong> — solo puede pagar en efectivo o cuenta corriente.</span>
+        </div>
+      )}
 
       {/* Saldo CC */}
       {showCCBalance && memberCCBalance !== 0 && (

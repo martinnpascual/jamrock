@@ -1,23 +1,50 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useProducts } from '@/hooks/useProducts'
+import { useProducts, type Product } from '@/hooks/useProducts'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, Plus, Package, AlertTriangle, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CartItem } from '@/hooks/useCheckout'
+import type { Member } from '@/types/database'
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
+/** Precio aplicable según el tipo de socio y su condición */
+function getMemberPrice(product: Product, member: Member | null): number {
+  if (!member) return product.price_basico
+  if (member.member_type === 'autoridad')       return product.price_autoridad      ?? product.price_basico
+  if (member.member_type === 'administrativo')  return product.price_administrativo ?? product.price_basico
+  if (
+    member.condicion === 'delegacion_sistema_vigente' ||
+    member.condicion === 'delegacion_contrato_vigente'
+  ) return product.price_basico
+  // No delega / en trámite / pendiente / etc.
+  return product.price_no_delega ?? product.price_basico
+}
+
+/** Etiqueta del nivel de precio que aplica al socio */
+function getPriceTierLabel(member: Member | null): string {
+  if (!member) return 'General'
+  if (member.member_type === 'autoridad')       return 'Autoridad'
+  if (member.member_type === 'administrativo')  return 'Administrativo'
+  if (
+    member.condicion === 'delegacion_sistema_vigente' ||
+    member.condicion === 'delegacion_contrato_vigente'
+  ) return 'General'
+  return 'No Delega'
+}
+
 interface Step3Props {
   cartItems:      CartItem[]
+  member:         Member | null
   onAddToCart:    (item: Omit<CartItem, 'quantity' | 'subtotal'>) => void
   onContinue:     () => void  // va a step 4
 }
 
-export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props) {
+export function Step3Products({ cartItems, member, onAddToCart, onContinue }: Step3Props) {
   const { data: products = [], isLoading } = useProducts()
   const [search, setSearch] = useState('')
 
@@ -38,9 +65,16 @@ export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-base font-semibold text-slate-100">Agregar productos</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Buscá y agregá productos al pedido</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-100">Agregar productos</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Buscá y agregá productos al pedido</p>
+        </div>
+        {member && (
+          <span className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-[#2DC814]/10 border border-[#2DC814]/20 text-[#2DC814]">
+            Precio {getPriceTierLabel(member)}
+          </span>
+        )}
       </div>
 
       {/* Buscador */}
@@ -86,7 +120,7 @@ export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-sm font-semibold text-[#2DC814]">{ARS(product.price_basico)}</p>
+                    <p className="text-sm font-semibold text-[#2DC814]">{ARS(getMemberPrice(product, member))}</p>
                     <span className="text-xs text-slate-500">·</span>
                     <p className={cn('text-xs', lowStock ? 'text-amber-400' : 'text-slate-500')}>
                       {product.stock_quantity} en stock
@@ -110,7 +144,7 @@ export function Step3Products({ cartItems, onAddToCart, onContinue }: Step3Props
                     onClick={() => onAddToCart({
                       product_id:   product.id,
                       product_name: product.name,
-                      unit_price:   product.price_basico,
+                      unit_price:   getMemberPrice(product, member),
                     })}
                     className="w-8 h-8 rounded-lg bg-[#2DC814]/10 hover:bg-[#2DC814]/20 border border-[#2DC814]/20 flex items-center justify-center text-[#2DC814] transition-colors"
                   >

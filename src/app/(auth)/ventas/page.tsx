@@ -31,6 +31,28 @@ import { downloadCashRegisterPDF } from '@/components/cash/CashRegisterPDF'
 type Tab = 'ventas' | 'productos' | 'caja'
 const ARS = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
+/** Precio aplicable al socio según su condición */
+function getMemberPrice(
+  product: { price_basico: number; price_no_delega: number | null; price_administrativo: number | null; price_autoridad: number | null },
+  member: { member_type: string; condicion: string } | null
+): number {
+  if (!member) return product.price_basico
+  if (member.member_type === 'autoridad')       return product.price_autoridad      ?? product.price_basico
+  if (member.member_type === 'administrativo')  return product.price_administrativo ?? product.price_basico
+  if (
+    member.condicion === 'delegacion_sistema_vigente' ||
+    member.condicion === 'delegacion_contrato_vigente'
+  ) return product.price_basico
+  return product.price_no_delega ?? product.price_basico
+}
+
+/** Solo "Delegación por Sistema Vigente" puede pagar por transferencia.
+ *  Sin socio asociado (venta anónima) → se permiten todos los métodos. */
+function canTransfer(member: { condicion: string } | null): boolean {
+  if (!member) return true  // venta sin socio asociado → sin restricción
+  return member.condicion === 'delegacion_sistema_vigente'
+}
+
 export default function VentasPage() {
   const [tab, setTab] = useState<Tab>('ventas')
   const { role } = useRole()
@@ -100,9 +122,11 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
   const pid = watch('product_id')
   const paymentMethod = watch('payment_method')
   const selProd = products.find(p => p.id === pid)
+  const selectedMember = members.find(m => m.id === selectedMemberId) ?? null
+  const allowTransferVenta = canTransfer(selectedMember)
   async function onSubmit(data: SaleFormData) {
     try {
-      await createSale.mutateAsync({ ...data, unit_price: data.unit_price || selProd?.price_basico || 0 })
+      await createSale.mutateAsync({ ...data, unit_price: data.unit_price || getMemberPrice(selProd ?? { price_basico: 0, price_no_delega: null, price_administrativo: null, price_autoridad: null }, selectedMember) })
       reset()
       setSelectedMemberId(null)
       setOpen(false)
@@ -185,9 +209,9 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Producto *</Label>
-              <Select value={pid ?? ''} onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', p.price_basico) }}>
+              <Select value={pid ?? ''} onValueChange={v => { setValue('product_id', v as string); const p = products.find(x => x.id === v); if (p) setValue('unit_price', getMemberPrice(p, selectedMember)) }}>
                 <SelectTrigger className={errors.product_id ? 'border-red-400' : ''}><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
-                <SelectContent>{products.filter(p => p.stock_quantity > 0).map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {ARS(p.price_basico)} ({p.stock_quantity} disp.)</SelectItem>)}</SelectContent>
+                <SelectContent>{products.filter(p => p.stock_quantity > 0).map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {ARS(getMemberPrice(p, selectedMember))} ({p.stock_quantity} disp.)</SelectItem>)}</SelectContent>
               </Select>
               {errors.product_id && <p className="text-xs text-red-500">{errors.product_id.message}</p>}
             </div>
@@ -203,6 +227,17 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
                 onChange={id => {
                   setSelectedMemberId(id)
                   setValue('member_id', id)
+                  // Recalcular precio según el nuevo socio
+                  if (pid) {
+                    const p = products.find(x => x.id === pid)
+                    const mem = members.find(m => m.id === id) ?? null
+                    if (p) setValue('unit_price', getMemberPrice(p, mem))
+                  }
+                  // Si el método era transferencia/mixto y el nuevo socio no puede transferir, cambiar a efectivo
+                  if (paymentMethod === 'transferencia' || paymentMethod === 'mixto') {
+                    const mem = members.find(m => m.id === id) ?? null
+                    if (!canTransfer(mem)) setValue('payment_method', 'efectivo')
+                  }
                 }}
                 placeholder="Sin socio asociado"
               />
@@ -211,8 +246,15 @@ function VentasTab({ isGerente }: { isGerente: boolean }) {
               <Label>Método de pago *</Label>
               <Select value={paymentMethod ?? ''} onValueChange={v => setValue('payment_method', v as 'efectivo' | 'transferencia' | 'mixto')}>
                 <SelectTrigger className={errors.payment_method ? 'border-red-400' : ''}><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                <SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="mixto">Mixto</SelectItem></SelectContent>
+                <SelectContent>
+                  <SelectItem value="efectivo">Efectivo</SelectItem>
+                  {allowTransferVenta && <SelectItem value="transferencia">Transferencia</SelectItem>}
+                  {allowTransferVenta && <SelectItem value="mixto">Mixto</SelectItem>}
+                </SelectContent>
               </Select>
+              {!allowTransferVenta && selectedMemberId && (
+                <p className="text-xs text-amber-500">Este socio solo puede pagar en efectivo (sin Delegación por Sistema Vigente)</p>
+              )}
               {errors.payment_method && <p className="text-xs text-red-500">{errors.payment_method.message}</p>}
             </div>
             {createSale.error && <p className="text-sm text-red-500">{(createSale.error as Error).message}</p>}
