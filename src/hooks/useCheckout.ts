@@ -49,6 +49,7 @@ export interface CheckoutState {
   currentStep:            1 | 2 | 3 | 4 | 5
   member:                 Member | null
   memberCCBalance:        number
+  memberHasCCAccount:     boolean
   dispensations:          DispensationInput[]
   cartItems:              CartItem[]
   paymentMethod:          PaymentMethod | null
@@ -69,6 +70,7 @@ const initialState: CheckoutState = {
   currentStep:            1,
   member:                 null,
   memberCCBalance:        0,
+  memberHasCCAccount:     false,
   dispensations:          [],
   cartItems:              [],
   paymentMethod:          null,
@@ -118,8 +120,8 @@ export function useCheckout() {
 
   // ── Setters ───────────────────────────────────────────────────────────────
 
-  const setMember = useCallback((member: Member | null, ccBalance = 0) => {
-    setState(s => ({ ...s, member, memberCCBalance: ccBalance, currentStep: member ? 2 : 1 }))
+  const setMember = useCallback((member: Member | null, ccBalance = 0, hasCCAccount = false) => {
+    setState(s => ({ ...s, member, memberCCBalance: ccBalance, memberHasCCAccount: hasCCAccount, currentStep: member ? 2 : 1 }))
   }, [])
 
   const setDispensation = useCallback((dispensation: DispensationInput | null) => {

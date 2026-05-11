@@ -71,7 +71,7 @@ export function CheckoutWizard() {
   const { data: config } = useDispensationConfig()
 
   const {
-    currentStep, member, memberCCBalance, dispensations,
+    currentStep, member, memberCCBalance, memberHasCCAccount, dispensations,
     cartItems, paymentMethod, amountCash, amountTransfer, amountCC,
     transferDetail, transferAmountReceived,
     changeGiven, dispensationSubtotal, productsSubtotal, total,
@@ -81,6 +81,9 @@ export function CheckoutWizard() {
   // Solo "Delegación por Sistema Vigente" o "Delegación por Contrato Vigente" puede pagar por transferencia
   const allowTransfer = member?.condicion === 'delegacion_sistema_vigente' ||
     member?.condicion === 'delegacion_contrato_vigente'
+
+  // Cuenta corriente solo disponible si el admin creó una cuenta para el socio
+  const allowCredit = (config?.allowCredit ?? true) && memberHasCCAccount
 
   // Mostrar carrito lateral solo en steps 2-4 y cuando haya algo para mostrar
   const showCart = currentStep >= 2 && currentStep <= 4
@@ -100,7 +103,7 @@ export function CheckoutWizard() {
         <div className="bg-[#111111] border border-white/[0.06] rounded-2xl p-5">
           {currentStep === 1 && (
             <Step1MemberSelect
-              onMemberSelected={(m, balance) => checkout.setMember(m, balance)}
+              onMemberSelected={(m, balance, hasCCAccount) => checkout.setMember(m, balance, hasCCAccount)}
             />
           )}
 
@@ -134,7 +137,7 @@ export function CheckoutWizard() {
             <Step4Payment
               total={total}
               memberCCBalance={memberCCBalance}
-              allowCredit={config?.allowCredit ?? true}
+              allowCredit={allowCredit}
               allowTransfer={allowTransfer}
               showCCBalance={config?.showCCBalance ?? true}
               paymentMethod={paymentMethod}

@@ -27,7 +27,7 @@ const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 interface Step1Props {
-  onMemberSelected: (member: Member, ccBalance: number) => void
+  onMemberSelected: (member: Member, ccBalance: number, hasCCAccount: boolean) => void
 }
 
 export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
@@ -36,7 +36,8 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
   const [error, setError]           = useState<string | null>(null)
   const [results, setResults]       = useState<Member[]>([])
   const [selected, setSelected]     = useState<Member | null>(null)
-  const [ccBalance, setCCBalance]   = useState(0)
+  const [ccBalance, setCCBalance]     = useState(0)
+  const [hasCCAccount, setHasCCAccount] = useState(false)
   const [searched, setSearched]     = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
@@ -85,13 +86,15 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
       .eq('member_id', member.id)
       .eq('is_deleted', false)
       .single()
+    const accountExists = cc !== null
     const balance = cc?.balance ?? 0
     setCCBalance(balance)
+    setHasCCAccount(accountExists)
   }
 
   function confirmSelection() {
     if (!selected) return
-    onMemberSelected(selected, ccBalance)
+    onMemberSelected(selected, ccBalance, hasCCAccount)
   }
 
   const isBlocked = selected && selected.reprocann_status !== 'vigente'
