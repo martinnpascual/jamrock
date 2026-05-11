@@ -98,7 +98,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: payment } = await admin
     .from('payments')
-    .select('id, amount')
+    .select('id, amount_ars')
     .eq('id', id)
     .single()
 
@@ -119,8 +119,8 @@ export async function DELETE(request: NextRequest) {
   await logActivity({
     admin, userId: user.id, userName,
     action: 'eliminar', entity: 'pago', entityId: id,
-    description: `Eliminó pago por $${payment?.amount}`,
-    metadata: { amount: payment?.amount },
+    description: `Eliminó pago por $${payment?.amount_ars}`,
+    metadata: { amount: payment?.amount_ars },
   })
 
   return NextResponse.json({ ok: true })
