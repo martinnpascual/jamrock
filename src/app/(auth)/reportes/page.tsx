@@ -60,7 +60,7 @@ function useReportData(type: ReportType, from: string, to: string, shiftFilter: 
             .order('created_at', { ascending: false })
             .limit(500),
           supabase.from('payments')
-            .select('amount, concept, payment_method, created_at, members!payments_member_id_fkey(first_name, last_name)')
+            .select('amount_ars, concept, payment_method, created_at, members!payments_member_id_fkey(first_name, last_name)')
             .eq('is_deleted', false).gte('created_at', range.from).lte('created_at', range.to)
             .order('created_at', { ascending: false })
             .limit(500),
@@ -189,7 +189,7 @@ export default function ReportesPage() {
       const paymentsCSV = toCSV(fd.payments.map(p => {
         const m = Array.isArray(p.members) ? p.members[0] : p.members
         const conceptLabel = p.concept === 'checkout' ? 'Dispensa' : p.concept === 'cuota' ? 'Cuota' : p.concept
-        return [m ? `${m.first_name} ${m.last_name}` : '', p.amount, conceptLabel, p.payment_method, new Date(p.created_at).toLocaleDateString('es-AR')]
+        return [m ? `${m.first_name} ${m.last_name}` : '', p.amount_ars, conceptLabel, p.payment_method, new Date(p.created_at).toLocaleDateString('es-AR')]
       }), ['Socio', 'Monto', 'Concepto', 'Método', 'Fecha'])
       downloadCSV(paymentsCSV, `pagos_${stamp}.csv`)
     }
@@ -420,7 +420,7 @@ export default function ReportesPage() {
 /* ── Tipos para tablas ── */
 type DispensaRow = { dispensation_number: string; quantity_grams: number; genetics: string; type: string; created_at: string; members: { first_name: string; last_name: string; member_number: string } | null }
 type SocioRow = { member_number: string; first_name: string; last_name: string; reprocann_status: string; member_type: string; created_at: string }
-type FinancieroData = { sales: { total: number; payment_method: string | null; created_at: string; commercial_products: { name: string } | null }[]; payments: { amount: number; concept: string; payment_method: string | null; created_at: string; members: { first_name: string; last_name: string } | null }[] }
+type FinancieroData = { sales: { total: number; payment_method: string | null; created_at: string; commercial_products: { name: string } | null }[]; payments: { amount_ars: number; concept: string; payment_method: string | null; created_at: string; members: { first_name: string; last_name: string } | null }[] }
 type StockRow = { genetics: string; initial_grams: number; current_grams: number; cost_per_gram: number | null; lot_date: string }
 type CajaRow = { id: string; register_date: string; shift: string; expected_total: number; actual_total: number | null; difference: number | null; status: string; closed_by: string | null; closed_at: string | null; notes: string | null; profiles: { full_name: string } | null }
 type RentabilidadRow = { genetics: string; outsourced_provider_name: string | null; initial_grams: number; current_grams: number; cost_total: number | null; sale_price_total: number | null; lot_date: string }
@@ -497,7 +497,7 @@ function SociosTable({ data }: { data: SocioRow[] }) {
 
 function FinancieroTable({ data }: { data: FinancieroData }) {
   const totalSales = data.sales.reduce((s, x) => s + x.total, 0)
-  const totalPayments = data.payments.reduce((s, x) => s + x.amount, 0)
+  const totalPayments = data.payments.reduce((s, x) => s + x.amount_ars, 0)
   return (
     <>
       <div className="px-5 py-3 bg-[#2DC814]/5 border-b border-[#2DC814]/10 text-sm text-[#2DC814] flex gap-6">
@@ -537,7 +537,7 @@ function FinancieroTable({ data }: { data: FinancieroData }) {
                 return (
                   <tr key={i} className="hover:bg-white/[0.02]">
                     <TD>{m ? `${m.first_name} ${m.last_name}` : '—'}</TD>
-                    <TD><span className="font-semibold text-[#2DC814]">{ARS(p.amount)}</span></TD>
+                    <TD><span className="font-semibold text-[#2DC814]">{ARS(p.amount_ars)}</span></TD>
                     <TD className="capitalize">{p.concept === 'checkout' ? 'Dispensa' : p.concept === 'cuota' ? 'Cuota' : p.concept.replace('_', ' ')}</TD>
                     <TD className="capitalize">{p.payment_method ?? '—'}</TD>
                     <TD className="text-slate-400">{new Date(p.created_at).toLocaleDateString('es-AR')}</TD>

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     .from('payments')
     .insert({
       member_id,
-      amount,
+      amount_ars: amount,
       concept,
       payment_method,
       notes: notes || null,
@@ -119,8 +119,8 @@ export async function DELETE(request: NextRequest) {
   await logActivity({
     admin, userId: user.id, userName,
     action: 'eliminar', entity: 'pago', entityId: id,
-    description: `Eliminó pago por $${payment?.amount}`,
-    metadata: { amount: payment?.amount },
+    description: `Eliminó pago por $${payment?.amount_ars}`,
+    metadata: { amount: payment?.amount_ars },
   })
 
   return NextResponse.json({ ok: true })

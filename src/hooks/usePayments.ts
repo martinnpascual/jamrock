@@ -7,7 +7,7 @@ import type { PaymentFormData } from '@/lib/validations/payment'
 export type Payment = {
   id: string
   member_id: string
-  amount: number
+  amount_ars: number
   concept: string
   payment_method: string | null
   notes: string | null
