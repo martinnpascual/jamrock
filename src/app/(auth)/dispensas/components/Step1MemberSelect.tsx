@@ -57,16 +57,33 @@ export function Step1MemberSelect({ onMemberSelected }: Step1Props) {
 
     if (err) {
       setError('Error al buscar socios')
-    } else {
-      const members = (data ?? []) as Member[]
-      setResults(members)
-      // Si el QR encontró exactamente 1 socio, seleccionarlo automáticamente
-      if (overrideQuery && members.length === 1) {
-        await selectMember(members[0])
-      } else if (overrideQuery && members.length === 0) {
-        setError('QR no reconocido. Buscá el socio manualmente.')
+      setLoading(false)
+      return
+    }
+
+    let members = (data ?? []) as Member[]
+
+    // Si no hay resultados y la query tiene múltiples palabras, buscar por cada
+    // palabra y quedarse con los socios que aparecen en todos los resultados
+    if (members.length === 0 && q.includes(' ')) {
+      const words = q.split(/\s+/).filter(Boolean)
+      const wordResults = await Promise.all(
+        words.map(w => supabase.rpc('search_members', { query: w }))
+      )
+      if (wordResults.every(r => !r.error && r.data?.length)) {
+        const sets = wordResults.map(r => new Set((r.data as Member[]).map(m => m.id)))
+        members = (wordResults[0].data as Member[]).filter(m => sets.every(s => s.has(m.id)))
       }
     }
+
+    setResults(members)
+    // Si el QR encontró exactamente 1 socio, seleccionarlo automáticamente
+    if (overrideQuery && members.length === 1) {
+      await selectMember(members[0])
+    } else if (overrideQuery && members.length === 0) {
+      setError('QR no reconocido. Buscá el socio manualmente.')
+    }
+
     setLoading(false)
   }
 
