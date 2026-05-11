@@ -46,11 +46,12 @@ function getMemberPrice(
   return product.price_no_delega ?? product.price_basico
 }
 
-/** Solo "Delegación por Sistema Vigente" puede pagar por transferencia.
+/** Solo "Delegación Vigente" (sistema o contrato) puede pagar por transferencia.
  *  Sin socio asociado (venta anónima) → se permiten todos los métodos. */
 function canTransfer(member: { condicion: string } | null): boolean {
   if (!member) return true  // venta sin socio asociado → sin restricción
-  return member.condicion === 'delegacion_sistema_vigente'
+  return member.condicion === 'delegacion_sistema_vigente' ||
+    member.condicion === 'delegacion_contrato_vigente'
 }
 
 export default function VentasPage() {

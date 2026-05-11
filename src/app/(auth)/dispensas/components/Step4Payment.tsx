@@ -144,7 +144,7 @@ export function Step4Payment({
       {!allowTransfer && (
         <div className="flex items-start gap-2 bg-amber-950/20 border border-amber-800/30 rounded-lg px-3 py-2.5 text-xs text-amber-300/80">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <span>Este socio no tiene <strong className="text-amber-300">Delegación por Sistema Vigente</strong> — solo puede pagar en efectivo o cuenta corriente.</span>
+          <span>Este socio no tiene <strong className="text-amber-300">Delegación Vigente</strong> — solo puede pagar en efectivo o cuenta corriente.</span>
         </div>
       )}
 

@@ -78,8 +78,9 @@ export function CheckoutWizard() {
     isProcessing, error, result,
   } = checkout
 
-  // Solo "Delegación por Sistema Vigente" puede pagar por transferencia
-  const allowTransfer = member?.condicion === 'delegacion_sistema_vigente'
+  // Solo "Delegación por Sistema Vigente" o "Delegación por Contrato Vigente" puede pagar por transferencia
+  const allowTransfer = member?.condicion === 'delegacion_sistema_vigente' ||
+    member?.condicion === 'delegacion_contrato_vigente'
 
   // Mostrar carrito lateral solo en steps 2-4 y cuando haya algo para mostrar
   const showCart = currentStep >= 2 && currentStep <= 4
