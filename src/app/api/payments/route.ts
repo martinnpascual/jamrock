@@ -98,7 +98,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: payment } = await admin
     .from('payments')
-    .select('id, amount')
+    .select('id, amount_ars')
     .eq('id', id)
     .single()
 

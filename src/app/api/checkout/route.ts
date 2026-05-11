@@ -1,4 +1,4 @@
-/**
+ /**
  * POST /api/checkout
  *
  * Flujo atómico de checkout: dispensa + productos + pago.

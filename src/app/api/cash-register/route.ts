@@ -30,7 +30,7 @@ export async function GET() {
   const [salesRes, paymentsRes] = await Promise.all([
     admin.from('sales').select('total, payment_method')
       .eq('is_deleted', false).gte('created_at', `${today}T00:00:00`),
-    admin.from('payments').select('amount, payment_method')
+    admin.from('payments').select('amount_ars, payment_method')
       .eq('is_deleted', false).gte('created_at', `${today}T00:00:00`),
   ])
 

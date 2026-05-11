@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+﻿export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
   if ((sociosVencidosRes.count ?? 0) > 0) {
     alerts.push({
       msg: `${sociosVencidosRes.count} socio(s) con REPROCANN en trámite`,
-      href: '/socios?status=en_tramite',
+      href: '/socios?reprocann=en_tramite',
       color: 'text-red-400 bg-red-950/40 border-red-900/50',
     })
   }
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
           icon={AlertTriangle}
           color={(sociosVencidosRes.count ?? 0) > 0 ? 'text-red-400' : 'text-[#2DC814]'}
           bg={(sociosVencidosRes.count ?? 0) > 0 ? 'bg-red-950/50' : 'bg-[#2DC814]/10'}
-          href="/socios?status=en_tramite"
+          href="/socios?reprocann=en_tramite"
           badge={(sociosVencidosRes.count ?? 0) > 0}
         />
         {isGerente && (
