@@ -89,6 +89,24 @@ export async function POST(request: NextRequest) {
     .single()
   const condicionAtDispense = memberFull?.condicion ?? null
 
+  // 1b-3. Validar método de pago según condición del socio
+  // Solo Delegación Vigente (sistema o contrato) puede usar transferencia
+  if (condicionAtDispense) {
+    const canTransfer =
+      condicionAtDispense === 'delegacion_sistema_vigente' ||
+      condicionAtDispense === 'delegacion_contrato_vigente'
+    const methodUsesTransfer =
+      payment.method === 'transferencia' ||
+      payment.method === 'mixto' ||
+      payment.method === 'mixto_3'
+    if (methodUsesTransfer && !canTransfer) {
+      return NextResponse.json(
+        { error: `Método de pago no permitido para condición "${condicionAtDispense}". Solo socios con Delegación Vigente pueden usar transferencia bancaria.` },
+        { status: 422 }
+      )
+    }
+  }
+
   // 1c. Validar lotes medicinales: existen, no eliminados, stock suficiente
   //     Acumular gramos por lot_id para evitar que múltiples dispensas del mismo lote excedan stock
   const uniqueLotIds = Array.from(new Set(dispInputs.map(d => d.lot_id)))
