@@ -35,7 +35,7 @@ export async function GET() {
   ])
 
   const salesTotal = (salesRes.data ?? []).reduce((s, r) => s + r.total, 0)
-  const paymentsTotal = (paymentsRes.data ?? []).reduce((s, r) => s + r.amount, 0)
+  const paymentsTotal = (paymentsRes.data ?? []).reduce((s, r) => s + Number(r.amount_ars ?? 0), 0)
   const expectedTotal = salesTotal + paymentsTotal
 
   // Calcular totales por turno

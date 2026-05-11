@@ -69,10 +69,10 @@ export default function PagosPage() {
   const today = new Date().toISOString().split('T')[0]
   const totalHoy = payments
     .filter((p) => p.created_at.startsWith(today))
-    .reduce((s, p) => s + p.amount, 0)
+    .reduce((s, p) => s + p.amount_ars, 0)
   const totalMes = payments
     .filter((p) => p.created_at.startsWith(new Date().toISOString().slice(0, 7)))
-    .reduce((s, p) => s + p.amount, 0)
+    .reduce((s, p) => s + p.amount_ars, 0)
 
   if (isLoading) {
     return (
@@ -133,7 +133,7 @@ export default function PagosPage() {
           </div>
           <div className="divide-y divide-white/[0.04]">
             {filtered.map((p) => (
-              <PaymentRow key={p.id} payment={p} canDelete={canDelete} onDelete={() => setDeleteConfirm({ id: p.id, amount: p.amount })} />
+              <PaymentRow key={p.id} payment={p} canDelete={canDelete} onDelete={() => setDeleteConfirm({ id: p.id, amount: p.amount_ars })} />
             ))}
           </div>
         </div>
@@ -189,7 +189,7 @@ function PaymentRow({ payment: p, canDelete, onDelete }: { payment: Payment; can
         )}
       </div>
 
-      <span className="text-sm font-semibold text-[#2DC814]">{formatARS(p.amount)}</span>
+      <span className="text-sm font-semibold text-[#2DC814]">{formatARS(p.amount_ars)}</span>
 
       <div className="flex items-center gap-3">
         <span className="text-xs text-slate-400">
