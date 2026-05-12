@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema, saleSchema, type ProductFormData, type SaleFormData } from '@/lib/validations/sale'
-import { useProducts, useCreateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from '@/hooks/useProducts'
 import { useProductCategories, useUpdateProductCategories } from '@/hooks/useProductCategories'
 import { useSales, useCreateSale, useDeleteSale } from '@/hooks/useSales'
 import { useTodayCashRegister, useOpenCashRegister, useCloseCashRegister, useReopenCashRegister, type CashRegister } from '@/hooks/useCashRegister'
@@ -296,10 +296,35 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   const { data: categories = [], isLoading: catsLoading } = useProductCategories()
   const updateCategories = useUpdateProductCategories()
   const createProduct = useCreateProduct()
+  const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
   const [open, setOpen] = useState(false)
   const [catManagerOpen, setCatManagerOpen] = useState(false)
   const [confirmDeleteProd, setConfirmDeleteProd] = useState<{ id: string; name: string } | null>(null)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const { register: regEdit, handleSubmit: handleEdit, reset: resetEdit, setValue: setEditValue, formState: { errors: editErrors, isSubmitting: editSubmitting } } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
+  })
+
+  function openEdit(p: Product) {
+    resetEdit({
+      name:                p.name,
+      description:         p.description ?? '',
+      category:            p.category ?? '',
+      price_basico:        p.price_basico,
+      stock_quantity:      p.stock_quantity,
+      low_stock_threshold: p.low_stock_threshold,
+    })
+    setEditingProduct(p)
+  }
+
+  async function onEditSubmit(data: ProductFormData) {
+    if (!editingProduct) return
+    try {
+      await updateProduct.mutateAsync({ id: editingProduct.id, ...data })
+      setEditingProduct(null)
+    } catch { /* error shown via updateProduct.error */ }
+  }
   // Category manager state
   const [editingCategories, setEditingCategories] = useState<string[]>([])
   const [newCatInput, setNewCatInput] = useState('')
@@ -397,7 +422,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
       )}
       {products.length === 0
         ? <div className="flex flex-col items-center py-16"><Package className="w-10 h-10 text-slate-300 mb-3" /><p className="text-sm text-slate-500">{isGerente ? 'Cargá el primer producto.' : 'El gerente debe cargar productos.'}</p></div>
-        : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.map(p => <ProductCard key={p.id} product={p} isGerente={isGerente} onDelete={() => setConfirmDeleteProd({ id: p.id, name: p.name })} />)}</div>}
+        : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.map(p => <ProductCard key={p.id} product={p} isGerente={isGerente} onEdit={() => openEdit(p)} onDelete={() => setConfirmDeleteProd({ id: p.id, name: p.name })} />)}</div>}
 
       {/* Dialog: Nuevo producto */}
       <Dialog open={open} onOpenChange={o => { if (!o) { reset(); setOpen(false) } }}>
@@ -490,6 +515,38 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
               {updateCategories.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : 'Guardar cambios'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Editar producto */}
+      <Dialog open={!!editingProduct} onOpenChange={o => { if (!o && !updateProduct.isPending) setEditingProduct(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4" />Editar producto</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit(onEditSubmit)} className="space-y-4">
+            <div className="space-y-1.5"><Label>Nombre *</Label><Input {...regEdit('name')} className={editErrors.name ? 'border-red-400' : ''} />{editErrors.name && <p className="text-xs text-red-500">{editErrors.name.message}</p>}</div>
+            <div className="space-y-1.5"><Label>Descripción</Label><Input {...regEdit('description')} /></div>
+            <div className="space-y-1.5">
+              <Label>Categoría</Label>
+              <Input list="cat-suggestions-edit" {...regEdit('category')} autoComplete="off" />
+              <datalist id="cat-suggestions-edit">
+                {categories.map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1.5"><Label>Precio ($) *</Label><Input type="number" step="0.01" {...regEdit('price_basico')} className={editErrors.price_basico ? 'border-red-400' : ''} />{editErrors.price_basico && <p className="text-xs text-red-500">{editErrors.price_basico.message}</p>}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Stock actual</Label><Input type="number" min={0} {...regEdit('stock_quantity')} /></div>
+              <div className="space-y-1.5"><Label>Alerta bajo</Label><Input type="number" min={0} {...regEdit('low_stock_threshold')} /></div>
+            </div>
+            {updateProduct.error && <p className="text-sm text-red-500">{(updateProduct.error as Error).message}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingProduct(null)}>Cancelar</Button>
+              <Button type="submit" disabled={editSubmitting || updateProduct.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+                {editSubmitting || updateProduct.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : 'Guardar cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -591,14 +648,19 @@ function ShiftRegisterCard({ reg, shift, isGerente, onClose, onReopen }: ShiftRe
   )
 }
 
-function ProductCard({ product: p, isGerente, onDelete }: { product: Product; isGerente: boolean; onDelete: () => void }) {
+function ProductCard({ product: p, isGerente, onEdit, onDelete }: { product: Product; isGerente: boolean; onEdit: () => void; onDelete: () => void }) {
   const isLow = p.stock_quantity > 0 && p.stock_quantity <= p.low_stock_threshold
   const isEmpty = p.stock_quantity === 0
   return (
     <div className={cn('bg-[#111111] border rounded-lg p-4 shadow-sm', isEmpty ? 'border-red-900/50 opacity-60' : isLow ? 'border-amber-800/50' : 'border-white/[0.06]')}>
       <div className="flex justify-between items-start">
         <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-100 truncate">{p.name}</p>{p.category && <p className="text-xs text-slate-500">{p.category}</p>}</div>
-        {isGerente && <button onClick={onDelete} className="text-slate-300 hover:text-red-400 ml-2"><Trash2 className="w-3.5 h-3.5" /></button>}
+        {isGerente && (
+          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+            <button onClick={onEdit} className="text-slate-500 hover:text-slate-200 p-0.5" title="Editar producto"><Pencil className="w-3.5 h-3.5" /></button>
+            <button onClick={onDelete} className="text-slate-500 hover:text-red-400 p-0.5" title="Eliminar producto"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
       </div>
       <div className="mt-3 flex items-end justify-between">
         <p className="text-lg font-bold text-slate-100">{ARS(p.price_basico)}</p>

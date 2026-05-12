@@ -182,6 +182,7 @@ export function CheckoutWizard() {
               total={total}
               onRemoveItem={currentStep === 3 ? checkout.removeFromCart : undefined}
               onUpdateQty={currentStep === 3 ? checkout.updateCartQuantity : undefined}
+              onUpdatePrice={currentStep === 3 ? checkout.updateCartItemPrice : undefined}
             />
           </div>
         )}

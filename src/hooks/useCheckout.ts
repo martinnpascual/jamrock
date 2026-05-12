@@ -188,6 +188,18 @@ export function useCheckout() {
     }
   }, [])
 
+  const updateCartItemPrice = useCallback((product_id: string, unit_price: number) => {
+    if (unit_price < 0) return
+    setState(s => ({
+      ...s,
+      cartItems: s.cartItems.map(i =>
+        i.product_id === product_id
+          ? { ...i, unit_price, subtotal: unit_price * i.quantity }
+          : i
+      ),
+    }))
+  }, [])
+
   const setPaymentMethod = useCallback((method: PaymentMethod | null) => {
     setState(s => ({
       ...s,
@@ -311,6 +323,7 @@ export function useCheckout() {
     addToCart,
     removeFromCart,
     updateCartQuantity,
+    updateCartItemPrice,
     setPaymentMethod,
     setCCMode,
     setCashAmount,

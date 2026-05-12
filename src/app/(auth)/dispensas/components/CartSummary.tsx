@@ -1,6 +1,7 @@
 'use client'
 
-import { Minus, Plus, X, ShoppingCart } from 'lucide-react'
+import { Minus, Plus, X, ShoppingCart, Pencil, Check } from 'lucide-react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { CartItem, DispensationInput } from '@/hooks/useCheckout'
 
@@ -19,6 +20,7 @@ interface CartSummaryProps {
   changeGiven?:         number
   onRemoveItem?:        (productId: string) => void
   onUpdateQty?:         (productId: string, qty: number) => void
+  onUpdatePrice?:       (productId: string, price: number) => void
 }
 
 export function CartSummary({
@@ -33,7 +35,24 @@ export function CartSummary({
   changeGiven,
   onRemoveItem,
   onUpdateQty,
+  onUpdatePrice,
 }: CartSummaryProps) {
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
+  const [priceInput, setPriceInput]         = useState<string>('')
+
+  function startEditPrice(item: CartItem) {
+    setEditingPriceId(item.product_id)
+    setPriceInput(String(item.unit_price))
+  }
+
+  function commitPrice(productId: string) {
+    const parsed = parseInt(priceInput.replace(/\D/g, ''), 10)
+    if (!isNaN(parsed) && parsed >= 0 && onUpdatePrice) {
+      onUpdatePrice(productId, parsed)
+    }
+    setEditingPriceId(null)
+  }
+
   const hasItems = cartItems.length > 0
   const hasDispensations = dispensations.length > 0
   const hasAnything = hasDispensations || hasItems
@@ -96,26 +115,63 @@ export function CartSummary({
                 </div>
 
                 {!readonly && onUpdateQty && onRemoveItem ? (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => onUpdateQty(item.product_id, item.quantity - 1)}
-                      className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-sm font-medium text-slate-200 w-5 text-center">{item.quantity}</span>
-                    <button
-                      onClick={() => onUpdateQty(item.product_id, item.quantity + 1)}
-                      className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => onRemoveItem(item.product_id)}
-                      className="w-6 h-6 rounded hover:bg-red-950/30 flex items-center justify-center text-slate-500 hover:text-red-400 transition-colors ml-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {/* Fila: qty +/- y eliminar */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onUpdateQty(item.product_id, item.quantity - 1)}
+                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-sm font-medium text-slate-200 w-5 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => onUpdateQty(item.product_id, item.quantity + 1)}
+                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => onRemoveItem(item.product_id)}
+                        className="w-6 h-6 rounded hover:bg-red-950/30 flex items-center justify-center text-slate-500 hover:text-red-400 transition-colors ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {/* Fila: edición de precio */}
+                    {onUpdatePrice && (
+                      editingPriceId === item.product_id ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-500">$</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={priceInput}
+                            onChange={e => setPriceInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitPrice(item.product_id)
+                              if (e.key === 'Escape') setEditingPriceId(null)
+                            }}
+                            autoFocus
+                            className="w-20 h-6 rounded bg-white/10 border border-white/20 text-xs text-slate-100 px-1.5 outline-none focus:border-[#2DC814]/50"
+                          />
+                          <button
+                            onClick={() => commitPrice(item.product_id)}
+                            className="w-6 h-6 rounded bg-[#2DC814]/20 hover:bg-[#2DC814]/30 flex items-center justify-center text-[#2DC814] transition-colors"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => startEditPrice(item)}
+                          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                        >
+                          <Pencil className="w-2.5 h-2.5" />
+                          Editar precio
+                        </button>
+                      )
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 flex-shrink-0">
