@@ -302,7 +302,7 @@ function ProductosTab({ isGerente }: { isGerente: boolean }) {
   const [catManagerOpen, setCatManagerOpen] = useState(false)
   const [confirmDeleteProd, setConfirmDeleteProd] = useState<{ id: string; name: string } | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const { register: regEdit, handleSubmit: handleEdit, reset: resetEdit, setValue: setEditValue, formState: { errors: editErrors, isSubmitting: editSubmitting } } = useForm<ProductFormData>({
+  const { register: regEdit, handleSubmit: handleEdit, reset: resetEdit, formState: { errors: editErrors, isSubmitting: editSubmitting } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema), defaultValues: { stock_quantity: 0, low_stock_threshold: 5 },
   })
 
